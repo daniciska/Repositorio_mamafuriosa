@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Comunidad Mama Furiosa</title>
+<meta name="description" content="Directorio de emprendimientos, servicios y trabajos de la comunidad Mama Furiosa. Si está difícil llegar a fin de mes, hagamos comunidad.">
+<meta name="theme-color" content="#6A2BC4">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%236A2BC4'/><text x='50' y='66' font-size='46' text-anchor='middle' fill='white' font-family='Arial' font-weight='900'>MF</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800;900&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="hero">
+  <svg class="deco deco-1" viewBox="0 0 60 60" aria-hidden="true"><path d="M30 4l6 18 18 6-18 6-6 18-6-18-18-6 18-6z" fill="#E59BE8"/></svg>
+  <svg class="deco deco-2" viewBox="0 0 120 40" aria-hidden="true"><path d="M4 30c14-26 26 26 40 0s26 26 40 0 22 18 32 6" fill="none" stroke="#FFD95E" stroke-width="6" stroke-linecap="round"/></svg>
+  <svg class="deco deco-3" viewBox="0 0 60 60" aria-hidden="true"><path d="M30 52S6 37 6 21a12 12 0 0124-4 12 12 0 0124 4c0 16-24 31-24 31z" fill="#FF7FB0"/></svg>
+  <svg class="deco deco-4" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14" fill="none" stroke="#7FD3FF" stroke-width="6"/></svg>
+
+  <div class="hero-inner">
+    <div class="logo" aria-label="Mama Furiosa">
+      <span>MAMA</span><span>FURIOSA<i class="dot"></i></span>
+    </div>
+    <p class="kicker">Comunidad</p>
+    <h1>Si está difícil llegar a fin de mes, <em>hagamos comunidad.</em></h1>
+    <p class="lead">Emprendimientos, servicios y trabajos de mujeres de la comunidad. Si puedes contratar, comprar o recomendar, <strong>empieza por aquí</strong>.</p>
+
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Busca: psicóloga, chocolates, abogada…" autocomplete="off" aria-label="Buscar en la comunidad">
+    </div>
+    <button class="btn btn-add hero-add" data-open-form>＋ Súmate a la comunidad</button>
+  </div>
+</header>
+
+<main>
+  <section class="cats-section">
+    <div class="section-head">
+      <h2>¿Qué estás buscando?</h2>
+      <span class="hand">elige una categoría ↓</span>
+    </div>
+    <div id="cats" class="cats" role="list"></div>
+  </section>
+
+  <section class="results">
+    <div class="results-head">
+      <div>
+        <h2 id="results-title">Toda la comunidad</h2>
+        <p id="results-count" class="muted"></p>
+      </div>
+      <div class="results-tools">
+        <label id="sub-wrap" class="sub-select" hidden>
+          <span>Subcategoría</span>
+          <select id="sub"></select>
+        </label>
+        <button id="clear" class="btn btn-ghost" hidden>✕ Ver todo</button>
+      </div>
+    </div>
+    <div id="list" class="list"></div>
+  </section>
+
+  <section class="cta">
+    <div class="cta-emoji" aria-hidden="true">💜</div>
+    <h2>¿Tienes un emprendimiento, ofreces un servicio o buscas trabajo?</h2>
+    <p>Agrégate tú (o a esa amiga que lo hace increíble). Puedes usar una categoría que ya existe o crear una nueva.</p>
+    <button class="btn btn-add" data-open-form>＋ Agregar mis datos</button>
+  </section>
+</main>
+
+<footer>
+  <p>Hecho con 💜 para la comunidad de <a href="https://www.instagram.com/mamafuriosayque/" target="_blank" rel="noopener">@mamafuriosayque</a></p>
+  <p class="muted small">Los datos fueron compartidos públicamente por cada persona. Si quieres corregir o quitar los tuyos, escríbenos.</p>
+</footer>
+
+<button class="fab" data-open-form aria-label="Agregar datos">＋</button>
+
+<dialog id="form-dialog">
+  <form id="form" method="dialog" novalidate>
+    <div class="form-head">
+      <h2>Súmate a la comunidad ✨</h2>
+      <button type="button" class="close" data-close aria-label="Cerrar">✕</button>
+    </div>
+
+    <label class="field">
+      <span>Tu nombre o el de tu emprendimiento *</span>
+      <input name="nombre" maxlength="80" required placeholder="Ej: Majo · Madame Ecléctica">
+    </label>
+
+    <label class="field">
+      <span>¿Qué haces? *</span>
+      <textarea name="descripcion" maxlength="400" rows="3" required placeholder="Cuéntanos qué ofreces, qué buscas o a quién quieres contratar"></textarea>
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>Categoría *</span>
+        <select name="categoria" required></select>
+      </label>
+      <label class="field">
+        <span>Subcategoría</span>
+        <select name="subcategoria"></select>
+      </label>
+    </div>
+
+    <div id="new-cat" class="new-box" hidden>
+      <p class="new-title">Nueva categoría</p>
+      <div class="grid-2">
+        <label class="field">
+          <span>Nombre</span>
+          <input name="nuevaCategoria" maxlength="40" placeholder="Ej: Mascotas">
+        </label>
+        <div class="field">
+          <span>Dibujito</span>
+          <div id="emoji-pick" class="emoji-pick" role="radiogroup"></div>
+        </div>
+      </div>
+    </div>
+
+    <label id="new-sub" class="field" hidden>
+      <span>Nueva subcategoría</span>
+      <input name="nuevaSubcategoria" maxlength="40" placeholder="Ej: Peluquería canina">
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>WhatsApp / teléfono</span>
+        <input name="whatsapp" inputmode="tel" maxlength="20" placeholder="+56 9 1234 5678">
+      </label>
+      <label class="field">
+        <span>Instagram</span>
+        <input name="instagram" maxlength="40" placeholder="@tuusuario">
+      </label>
+    </div>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>¿Desde dónde?</span>
+        <input name="ubicacion" maxlength="60" placeholder="Comuna / ciudad">
+      </label>
+      <label class="field">
+        <span>Modalidad</span>
+        <input name="modalidad" maxlength="60" placeholder="Online, presencial, envíos…">
+      </label>
+    </div>
+
+    <label class="field hp" aria-hidden="true">
+      <span>No llenar</span>
+      <input name="sitio" tabindex="-1" autocomplete="off">
+    </label>
+
+    <p class="muted small">* Obligatorio. Deja al menos un contacto (WhatsApp o Instagram). Al enviar, tus datos quedan visibles públicamente.</p>
+    <p id="form-msg" class="form-msg" role="status"></p>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+      <button type="submit" class="btn btn-add">Publicar 💜</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="datos.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
