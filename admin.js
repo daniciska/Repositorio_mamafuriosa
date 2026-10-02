@@ -67,7 +67,7 @@
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
     tab = b.dataset.tab;
     document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b));
-    ["pendientes", "solicitudes", "fichas"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
+    ["pendientes", "solicitudes", "fichas", "instagram"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
   }));
 
   function catsTexto(p, cats) {
@@ -97,18 +97,29 @@
 
     // Aportes pendientes
     const catsPend = window.MF.construir({ aportes: pend }).categorias;
-    $("#tab-pendientes").innerHTML = pend.length ? pend.map((a) => `
+    const existentes = new Set(modelo.personas.map((p) => cleanIg(p.instagram).toLowerCase()).filter(Boolean));
+    const repetido = (a) => a.origen === "instagram" && existentes.has(cleanIg(a.instagram).toLowerCase());
+    const repetidos = pend.filter(repetido);
+    $("#tab-pendientes").innerHTML = (repetidos.length ? `<div class="toolbar"><button class="btn btn-no small-btn" data-rechazar-repetidos>✕ Rechazar los ${repetidos.length} comentarios de cuentas que ya están en el directorio</button></div>` : "") +
+      (pend.length ? pend.map((a) => {
+        const sinCat = !(a.cats || []).some((x) => x.c);
+        return `
       <article class="item">
-        <h3>${esc(titulo(a))}</h3>
-        <div class="meta">Recibido ${esc(fecha(a.fecha))} · ${contacto(a)}</div>
-        <div>${catsTexto(a, catsPend)}${a.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === a.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
+        <h3>${esc(titulo(a))}
+          ${a.origen === "instagram" ? '<span class="pill">📸 comentario de Instagram</span>' : '<span class="pill">formulario</span>'}
+          ${repetido(a) ? '<span class="pill warn">ya está en el directorio</span>' : ""}
+          ${a.respuestaA ? `<span class="pill">respuesta a @${esc(a.respuestaA)}</span>` : ""}
+        </h3>
+        <div class="meta">${a.comentarioFecha ? "Comentado " + esc(fecha(a.comentarioFecha)) : "Recibido " + esc(fecha(a.fecha))} · ${contacto(a)}</div>
+        <div>${sinCat ? '<span class="pill warn">sin categoría</span>' : catsTexto(a, catsPend)}${a.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === a.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
         <p>${esc(a.descripcion)}</p>
         <div class="actions">
-          <button class="btn btn-ok" data-act="aprobar" data-id="${esc(a.id)}">✓ Aprobar</button>
-          <button class="btn btn-ghost" data-edit-pend="${esc(a.id)}">✎ Editar y aprobar</button>
+          ${sinCat ? "" : `<button class="btn btn-ok" data-act="aprobar" data-id="${esc(a.id)}">✓ Aprobar</button>`}
+          <button class="btn ${sinCat ? "btn-ok" : "btn-ghost"}" data-edit-pend="${esc(a.id)}">${sinCat ? "✎ Elegir categoría y aprobar" : "✎ Editar y aprobar"}</button>
           <button class="btn btn-no" data-act="rechazar" data-id="${esc(a.id)}">✕ Rechazar</button>
         </div>
-      </article>`).join("") : `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>`;
+      </article>`;
+      }).join("") : `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>`);
 
     // Solicitudes
     const verTodas = $("#ver-cerradas").checked;
@@ -131,6 +142,7 @@
     }).join("") : `<p class="empty-msg">No hay solicitudes ${verTodas ? "" : "pendientes "}🙌</p>`;
 
     renderFichas();
+    renderInstagram();
   }
 
   function renderFichas() {
@@ -195,6 +207,133 @@
     }
     if (e.target.closest("[data-close-edit]")) $("#edit-dialog").close();
   });
+
+  // ---------- instagram ----------
+  let medios = null;
+  const hoy = () => new Date().toISOString().slice(0, 10);
+
+  function renderInstagram() {
+    const ig = datos.instagram || {};
+    const cb = location.origin + "/api/instagram/callback";
+    let html = "";
+    if (!ig.configurada) {
+      html = `<article class="item">
+        <h3>Conectar el post de Instagram</h3>
+        <p>Para traer automáticamente los comentarios nuevos del post, primero hay que crear una app en Meta y
+        guardar sus claves en Netlify (variables <b>IG_APP_ID</b> e <b>IG_APP_SECRET</b>). La guía paso a paso está en
+        <b>docs/conectar-instagram.md</b> del repositorio.</p>
+        <p class="meta">Dirección de regreso que hay que registrar en la app de Meta:</p>
+        <div class="copiar">${esc(cb)}</div>
+      </article>`;
+    } else if (!ig.conectada) {
+      html = `<article class="item">
+        <h3>Conectar la cuenta de Instagram</h3>
+        <p>La dueña de la cuenta del post debe pulsar este botón (o hacerlo contigo en videollamada) e iniciar sesión en Instagram.
+        No se comparte ninguna contraseña con este sitio y el permiso se puede quitar cuando quiera.</p>
+        <div class="actions">
+          <button class="btn btn-add" data-ig="ig-iniciar">📸 Conectar Instagram aquí</button>
+          <button class="btn btn-ghost" data-ig="ig-enlace">🔗 Copiar enlace para enviárselo</button>
+        </div>
+        <p class="meta">El enlace sirve por 48 horas. Ella lo abre en su teléfono, inicia sesión en Instagram y acepta; no necesita la clave de este panel.</p>
+        <div id="ig-enlace-box"></div>
+      </article>`;
+    } else {
+      const r = ig.ultimoResultado;
+      html = `<article class="item">
+        <h3>Conectado como @${esc(ig.usuario)} <span class="pill ok">activo</span></h3>
+        <div class="meta">El permiso dura ${esc(ig.venceEnDias)} días más y se renueva solo con cada sincronización.</div>
+        ${ig.post ? `<p><b>Post:</b> <a href="${esc(ig.post.permalink)}" target="_blank" rel="noopener">${esc(ig.post.caption || ig.post.permalink)}</a></p>
+          <div class="meta">${ig.desde ? "Se importan los comentarios desde el " + esc(ig.desde) : "Se importan todos los comentarios"} ·
+          Se revisa sola cada 6 horas.</div>
+          <div class="meta">${ig.ultimaSync ? `Última revisión: ${esc(fecha(ig.ultimaSync))}${r ? ` · ${r.nuevos} nuevos, ${r.ignorados} ignorados (saludos, emojis, ya vistos o de la cuenta dueña)` : ""}` : "Todavía no se ha revisado."}</div>` :
+          `<p class="form-msg err">Falta elegir de qué post traer los comentarios.</p>`}
+        <div class="actions">
+          ${ig.post ? `<button class="btn btn-ok" data-ig="ig-sincronizar">↻ Revisar comentarios ahora</button>` : ""}
+          <button class="btn btn-ghost" data-ig="ig-medios">${ig.post ? "Cambiar post" : "Elegir post"}</button>
+          <button class="btn btn-no" data-ig="ig-desconectar">Desconectar</button>
+        </div>
+      </article>`;
+      if (medios) {
+        html += `<article class="item">
+          <h3>¿De qué post traemos los comentarios?</h3>
+          <label class="field" style="max-width:260px"><span>Importar comentarios desde (los anteriores ya están en el directorio)</span>
+            <input type="date" id="ig-desde" value="${esc(ig.desde || hoy())}"></label>
+          <div class="medios">${medios.map((m) => `<button class="medio" data-medio="${esc(m.id)}">
+            ${esc(m.caption || "(sin texto)")}<small>${esc(fecha(m.fecha))}${m.comentarios != null ? " · " + esc(m.comentarios) + " comentarios" : ""}</small></button>`).join("")}</div>
+        </article>`;
+      }
+    }
+    $("#tab-instagram").innerHTML = html;
+  }
+
+  document.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-ig]");
+    const m = e.target.closest("[data-medio]");
+    const rep = e.target.closest("[data-rechazar-repetidos]");
+    if (!b && !m && !rep) return;
+    const btn = b || m || rep;
+    btn.disabled = true;
+    try {
+      if (rep) {
+        if (!confirm("¿Rechazar todos los comentarios de cuentas que ya tienen ficha?")) { btn.disabled = false; return; }
+        const existentes = new Set(modelo.personas.map((p) => cleanIg(p.instagram).toLowerCase()));
+        const ids = datos.aportes.filter((a) => a.estado === "pendiente" && a.origen === "instagram" && existentes.has(cleanIg(a.instagram).toLowerCase())).map((a) => a.id);
+        for (const id of ids) await api("POST", { accion: "rechazar", id });
+        toast(`${ids.length} comentarios repetidos rechazados`);
+        await cargar();
+      } else if (m) {
+        const sel = medios.find((x) => x.id === m.dataset.medio);
+        await api("POST", { accion: "ig-elegir", mediaId: sel.id, permalink: sel.permalink, caption: sel.caption, desde: $("#ig-desde").value });
+        medios = null;
+        toast("Post elegido. Revisando comentarios…");
+        const r = await api("POST", { accion: "ig-sincronizar" });
+        toast(`${r.nuevos || 0} comentarios nuevos para revisar`);
+        await cargar();
+      } else if (b.dataset.ig === "ig-iniciar") {
+        const r = await api("POST", { accion: "ig-iniciar" });
+        location.href = r.url;
+        return;
+      } else if (b.dataset.ig === "ig-enlace") {
+        const r = await api("POST", { accion: "ig-iniciar" });
+        $("#ig-enlace-box").innerHTML = `<div class="copiar">${esc(r.url)}</div>`;
+        try { await navigator.clipboard.writeText(r.url); toast("Enlace copiado. Envíaselo por WhatsApp o DM 💜"); }
+        catch { toast("Copia el enlace que aparece abajo"); }
+      } else if (b.dataset.ig === "ig-medios") {
+        medios = (await api("POST", { accion: "ig-medios" })).medios;
+        renderInstagram();
+      } else if (b.dataset.ig === "ig-sincronizar") {
+        const r = await api("POST", { accion: "ig-sincronizar" });
+        toast(r.omitido || `${r.nuevos} comentarios nuevos para revisar en "Aportes por aprobar"`);
+        await cargar();
+      } else if (b.dataset.ig === "ig-desconectar") {
+        if (!confirm("¿Desconectar Instagram? Dejarán de llegar comentarios nuevos.")) { btn.disabled = false; return; }
+        await api("POST", { accion: "ig-desconectar" });
+        toast("Instagram desconectado");
+        await cargar();
+      }
+    } catch (err) { toast(err.message); }
+    btn.disabled = false;
+  });
+
+  // Vuelta desde la autorización de Instagram
+  (function () {
+    const q = new URLSearchParams(location.search);
+    if (!q.get("ig")) return;
+    history.replaceState(null, "", location.pathname);
+    if (!clave) {
+      // Quien autorizó puede ser la dueña de la cuenta, sin acceso al panel: solo le mostramos el resultado.
+      const msg = $("#login-msg");
+      msg.className = "form-msg";
+      msg.textContent = q.get("ig") === "ok"
+        ? "✅ ¡Listo! Instagram quedó conectado. Ya puedes cerrar esta página."
+        : "No se pudo conectar Instagram: " + (q.get("msg") || "") + ". Pide un enlace nuevo.";
+      return;
+    }
+    setTimeout(() => {
+      document.querySelector('[data-tab="instagram"]')?.click();
+      toast(q.get("ig") === "ok" ? "¡Instagram conectado! Ahora elige el post." : "No se pudo conectar: " + (q.get("msg") || ""));
+    }, 600);
+  })();
 
   // ---------- editor ----------
   const ef = $("#edit-form").elements;

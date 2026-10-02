@@ -43,6 +43,12 @@
   .icon-btn { border: 0; background: var(--bg); border-radius: 10px; width: 38px; cursor: pointer; font-size: 1rem; }
   .empty-msg { text-align: center; color: var(--ink-soft); padding: 30px 10px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: .9rem; color: var(--ink-soft); }
+  .medios { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .medio { text-align: left; font: inherit; border: 2px solid var(--line); background: #fff; border-radius: 14px; padding: 12px; cursor: pointer; color: var(--ink); }
+  .medio:hover { border-color: var(--purple); }
+  .medio small { color: var(--ink-soft); display: block; margin-top: 6px; }
+  .copiar { font-family: ui-monospace, monospace; font-size: .85rem; background: var(--bg); border-radius: 10px; padding: 8px 10px; overflow-wrap: anywhere; }
+  .item ol { margin: 0; padding-left: 20px; }
   @media (max-width: 560px) { .catrow { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -69,9 +75,12 @@
       <button class="tab" role="tab" data-tab="pendientes" aria-selected="true">Aportes por aprobar <span id="b-pend" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="solicitudes" aria-selected="false">Solicitudes de cambio <span id="b-sol" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="fichas" aria-selected="false">Todas las fichas</button>
+      <button class="tab" role="tab" data-tab="instagram" aria-selected="false">📸 Instagram</button>
     </div>
 
     <div id="tab-pendientes"></div>
+
+    <div id="tab-instagram" hidden></div>
 
     <div id="tab-solicitudes" hidden>
       <div class="toolbar"><label class="chk"><input type="checkbox" id="ver-cerradas"> Mostrar también las resueltas/descartadas</label></div>

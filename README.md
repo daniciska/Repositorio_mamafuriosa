@@ -38,11 +38,13 @@ Los links de Instagram salen del @usuario tal como aparece en la captura.
 | `netlify/functions/aportes.mjs` | `GET` datos públicos · `POST` propuesta (queda pendiente) |
 | `netlify/functions/solicitudes.mjs` | `POST` solicitud de cambio |
 | `netlify/functions/admin.mjs` | API del panel (requiere la clave) |
+| `netlify/lib/instagram.mjs`, `netlify/functions/instagram-*.mjs` | Conexión con Instagram y revisión automática de comentarios cada 6 h |
+| `docs/conectar-instagram.md` | Guía para conectar el post de Instagram |
 
 ## Publicar
 
 Sitio en Netlify (sin comando de build, carpeta de publicación `.`). Los datos se guardan en Netlify Blobs
-(stores `aportes`, `solicitudes`, `ediciones`).
+(stores `aportes`, `solicitudes`, `ediciones`, `instagram`).
 
 La clave del panel **no está en el código**: se configura como variable de entorno secreta `ADMIN_PASSWORD`
 en Netlify → Project configuration → Environment variables. Para cambiarla, edita esa variable y vuelve a desplegar.

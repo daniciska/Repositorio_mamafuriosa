@@ -43,7 +43,8 @@
     }
     for (const a of aportes) {
       if (a.oculta && !incluirOcultas) continue;
-      const cats = (a.cats && a.cats.length ? a.cats : [{ c: a.categoria, s: a.subcategoria }]).map((x) => asegurarCat(x, a));
+      const crudas = a.cats && a.cats.length ? a.cats : a.categoria ? [{ c: a.categoria, s: a.subcategoria }] : [];
+      const cats = crudas.filter((x) => x && x.c).map((x) => asegurarCat(x, a));
       personas.push({ ...a, cats, nuevo: true });
     }
     return { categorias, personas };
