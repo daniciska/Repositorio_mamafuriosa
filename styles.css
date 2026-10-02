@@ -318,3 +318,10 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(3px); }
 @media (max-width: 560px) { .list { grid-template-columns: minmax(0, 1fr); } }
 .card-top > div { min-width: 0; }
 .card h3 { overflow-wrap: anywhere; }
+
+/* ---------- filtro por ubicación ---------- */
+.chk-online {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; font-weight: 600;
+  color: var(--ink-soft); padding: 10px 2px; cursor: pointer;
+}
+.chk-online input { width: 18px; height: 18px; accent-color: var(--purple); }

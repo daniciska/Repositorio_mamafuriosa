@@ -52,6 +52,13 @@
         <p id="results-count" class="muted"></p>
       </div>
       <div class="results-tools">
+        <label class="sub-select">
+          <span>📍 Ubicación</span>
+          <select id="lugar"></select>
+        </label>
+        <label id="incl-wrap" class="chk-online" hidden>
+          <input type="checkbox" id="incl-online" checked> Incluir online y envíos a todo Chile
+        </label>
         <label id="sub-wrap" class="sub-select" hidden>
           <span>Subcategoría</span>
           <select id="sub"></select>
@@ -224,6 +231,7 @@
 
 <script src="datos.js"></script>
 <script src="modelo.js"></script>
+<script src="ubicacion.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

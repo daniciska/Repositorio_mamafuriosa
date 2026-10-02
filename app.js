@@ -10,13 +10,16 @@
   const $ = (s) => document.querySelector(s);
   const els = {
     cats: $("#cats"), list: $("#list"), q: $("#q"), sub: $("#sub"), subWrap: $("#sub-wrap"),
+    lugar: $("#lugar"), inclWrap: $("#incl-wrap"), inclOnline: $("#incl-online"),
     clear: $("#clear"), title: $("#results-title"), count: $("#results-count"),
     dialog: $("#form-dialog"), form: $("#form"), msg: $("#form-msg"), toast: $("#toast"),
     newCat: $("#new-cat"), newSub: $("#new-sub"), emojiPick: $("#emoji-pick"),
     solDialog: $("#sol-dialog"), solForm: $("#sol-form"), solMsg: $("#sol-msg")
   };
 
-  const state = { cat: null, sub: "", q: "" };
+  const state = { cat: null, sub: "", q: "", lugar: "", inclOnline: true };
+  const UBI = window.MF_UBICACION;
+  const ONLINE = "online";
   let categorias = [];
   let personas = [];
   let remoto = { aportes: [], ediciones: [] };
@@ -48,6 +51,7 @@
   // ---------- data ----------
   function build() {
     ({ categorias, personas } = window.MF.construir(remoto));
+    for (const p of personas) p.ubic = UBI.detectar(p);
   }
 
   async function load() {
@@ -85,7 +89,7 @@
   function renderSub() {
     const cat = catById(state.cat);
     els.subWrap.hidden = !cat;
-    els.clear.hidden = !cat && !state.q;
+    els.clear.hidden = !cat && !state.q && !state.lugar;
     if (!cat) return;
     const opts = cat.subs.map((s) => {
       const n = personas.filter((p) => p.cats.some((x) => x.c === cat.id && x.s === s)).length;
@@ -94,9 +98,31 @@
     els.sub.innerHTML = `<option value="">Todas (${countFor(cat.id)})</option>` + opts.join("");
   }
 
-  function matches(p) {
+  function enLugar(p, lugar, inclOnline) {
+    if (!lugar) return true;
+    if (lugar === ONLINE) return p.ubic.todoChile;
+    return p.ubic.regiones.includes(lugar) || (inclOnline && p.ubic.todoChile);
+  }
+
+  function enCategoria(p) {
     const cat = state.cat;
-    if (cat && !p.cats.some((x) => x.c === cat && (!state.sub || x.s === state.sub))) return false;
+    return !cat || p.cats.some((x) => x.c === cat && (!state.sub || x.s === state.sub));
+  }
+
+  function renderLugar() {
+    const base = personas.filter(enCategoria);
+    const n = (id) => base.filter((p) => (id === ONLINE ? p.ubic.todoChile : p.ubic.regiones.includes(id))).length;
+    const regiones = UBI.REGIONES.map((r) => ({ ...r, n: n(r.id) })).filter((r) => r.n || r.id === state.lugar);
+    els.lugar.innerHTML = `<option value="">Todas (${base.length})</option>` +
+      `<option value="${ONLINE}">💻 Online / todo Chile (${n(ONLINE)})</option>` +
+      regiones.map((r) => `<option value="${esc(r.id)}">${esc(r.nombre)}${r.n ? ` (${r.n})` : ""}</option>`).join("");
+    els.lugar.value = state.lugar;
+    els.inclWrap.hidden = !state.lugar || state.lugar === ONLINE;
+  }
+
+  function matches(p) {
+    if (!enCategoria(p)) return false;
+    if (!enLugar(p, state.lugar, state.inclOnline)) return false;
     if (state.q) {
       const hay = norm([p.nombre, p.instagram, ...(p.otrosInstagram || []), p.descripcion, p.ubicacion, p.modalidad,
         ...p.cats.map((x) => x.s), ...p.cats.map((x) => catById(x.c)?.nombre)].join(" "));
@@ -150,12 +176,23 @@
     const cat = catById(state.cat);
     const items = personas.filter(matches).sort((a, b) => (b.nuevo === true) - (a.nuevo === true));
     els.title.textContent = cat ? `${cat.emoji} ${cat.nombre}` : state.q ? `Resultados para “${state.q}”` : "Toda la comunidad";
-    els.count.textContent = items.length === 1 ? "1 persona" : `${items.length} personas`;
+    const region = state.lugar && state.lugar !== ONLINE ? UBI.REGIONES.find((r) => r.id === state.lugar) : null;
+    const personasTxt = (n) => (n === 1 ? "1 persona" : `${n} personas`);
+    if (region) {
+      // Primero las de la zona; después las que atienden online o envían a todo Chile.
+      const local = (p) => p.ubic.regiones.includes(region.id);
+      items.sort((a, b) => local(b) - local(a));
+      const nLocal = items.filter(local).length, nOnline = items.length - nLocal;
+      els.count.textContent = (nLocal ? `${personasTxt(nLocal)} en ${region.nombre}` : `Aún nadie en ${region.nombre}`) +
+        (nOnline ? ` · ${nOnline} más que atienden online o envían a todo Chile` : "");
+    } else {
+      els.count.textContent = personasTxt(items.length) + (state.lugar === ONLINE ? " que atienden online o envían a todo Chile" : "");
+    }
     if (!items.length) {
       els.list.innerHTML = `<div class="empty">
         <div class="big">${cat ? esc(cat.emoji) : "🔎"}</div>
-        <h3>${cat ? "Aún no hay nadie aquí" : "No encontramos coincidencias"}</h3>
-        <p>${cat ? "¡Sé la primera en sumarte a esta categoría!" : "Prueba con otra palabra o explora las categorías."}</p>
+        <h3>${state.lugar ? "Aún no hay nadie en esta zona" : cat ? "Aún no hay nadie aquí" : "No encontramos coincidencias"}</h3>
+        <p>${state.lugar ? "Prueba con otra ubicación o súmate tú si eres de aquí." : cat ? "¡Sé la primera en sumarte a esta categoría!" : "Prueba con otra palabra o explora las categorías."}</p>
         <button class="btn btn-add" data-open-form>＋ Agregar datos</button>
       </div>`;
       return;
@@ -163,7 +200,7 @@
     els.list.innerHTML = items.map(card).join("");
   }
 
-  function renderAll() { renderCats(); renderSub(); renderList(); }
+  function renderAll() { renderCats(); renderSub(); renderLugar(); renderList(); }
 
   // ---------- interactions ----------
   els.cats.addEventListener("click", (e) => {
@@ -182,11 +219,13 @@
     const open = d.classList.toggle("open");
     b.textContent = open ? "Ver menos" : "Ver más";
   });
-  els.sub.addEventListener("change", () => { state.sub = els.sub.value; renderList(); });
+  els.sub.addEventListener("change", () => { state.sub = els.sub.value; renderLugar(); renderList(); });
   els.q.addEventListener("input", () => { state.q = els.q.value.trim(); renderSub(); renderList(); });
   els.clear.addEventListener("click", () => {
-    state.cat = null; state.sub = ""; state.q = ""; els.q.value = ""; renderAll();
+    state.cat = null; state.sub = ""; state.q = ""; state.lugar = ""; els.q.value = ""; renderAll();
   });
+  els.lugar.addEventListener("change", () => { state.lugar = els.lugar.value; renderSub(); renderLugar(); renderList(); });
+  els.inclOnline.addEventListener("change", () => { state.inclOnline = els.inclOnline.checked; renderList(); });
 
   // ---------- form ----------
   const f = els.form.elements;
