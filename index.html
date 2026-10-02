@@ -72,7 +72,8 @@
 
 <footer>
   <p>Hecho con 💜 para la comunidad de <a href="https://www.instagram.com/mamafuriosayque/" target="_blank" rel="noopener">@mamafuriosayque</a></p>
-  <p class="muted small">Los datos fueron compartidos públicamente por cada persona. Si quieres corregir o quitar los tuyos, escríbenos.</p>
+  <p class="muted small">Los datos fueron compartidos públicamente por cada persona en los comentarios del post.</p>
+  <p><button class="btn btn-ghost small-btn" data-open-sol>⚑ Solicitar un cambio o reportar un dato</button></p>
 </footer>
 
 <button class="fab" data-open-form aria-label="Agregar datos">＋</button>
@@ -151,12 +152,67 @@
       <input name="sitio" tabindex="-1" autocomplete="off">
     </label>
 
-    <p class="muted small">* Obligatorio. Deja al menos un contacto (WhatsApp o Instagram). Al enviar, tus datos quedan visibles públicamente.</p>
+    <p class="muted small">* Obligatorio. Deja al menos un contacto (WhatsApp o Instagram). Revisaremos tus datos antes de publicarlos; una vez aprobados quedan visibles para todas.</p>
     <p id="form-msg" class="form-msg" role="status"></p>
 
     <div class="form-actions">
       <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
-      <button type="submit" class="btn btn-add">Publicar 💜</button>
+      <button type="submit" class="btn btn-add">Enviar 💜</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="sol-dialog">
+  <form id="sol-form" method="dialog" novalidate>
+    <div class="form-head">
+      <h2>Solicitar un cambio ⚑</h2>
+      <button type="button" class="close" data-close-sol aria-label="Cerrar">✕</button>
+    </div>
+    <p class="muted small">¿Viste un error, un dato falso o algo sospechoso? Cuéntanos y lo revisaremos. Nadie puede editar los datos directamente: cada cambio lo aprueba la administración.</p>
+
+    <label class="field">
+      <span>¿A qué dato corresponde? *</span>
+      <select name="fichaId" required></select>
+    </label>
+
+    <label class="field">
+      <span>Razón del cambio *</span>
+      <select name="razon" required>
+        <option value="">Elige una…</option>
+        <option>Error de tipeo</option>
+        <option>Instagram malo</option>
+        <option>Categoría mala</option>
+        <option>Dato falso</option>
+        <option>Estafa</option>
+      </select>
+    </label>
+
+    <label class="field">
+      <span>Descripción *</span>
+      <textarea name="descripcion" maxlength="1000" rows="3" required placeholder="¿Qué hay que cambiar? Si sabes el dato correcto, inclúyelo"></textarea>
+    </label>
+
+    <div class="grid-2">
+      <label class="field">
+        <span>Tu nombre *</span>
+        <input name="nombre" maxlength="80" required>
+      </label>
+      <label class="field">
+        <span>Tu mail *</span>
+        <input name="email" type="email" maxlength="120" required placeholder="nombre@correo.cl">
+      </label>
+    </div>
+
+    <label class="field hp" aria-hidden="true">
+      <span>No llenar</span>
+      <input name="sitio" tabindex="-1" autocomplete="off">
+    </label>
+
+    <p class="muted small">Tu mail solo lo ve la administración, por si necesitamos más información.</p>
+    <p id="sol-msg" class="form-msg" role="status"></p>
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" data-close-sol>Cancelar</button>
+      <button type="submit" class="btn btn-add">Enviar solicitud</button>
     </div>
   </form>
 </dialog>
@@ -164,6 +220,7 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="datos.js"></script>
+<script src="modelo.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

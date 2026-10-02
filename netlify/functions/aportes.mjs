@@ -1,49 +1,36 @@
-// API pública de aportes de la comunidad.
-// GET  /api/aportes  -> lista de aportes
-// POST /api/aportes  -> agrega un aporte nuevo
-// Los datos se guardan en Netlify Blobs (store "aportes"); se pueden revisar o borrar desde el panel de Netlify.
-import { getStore } from "@netlify/blobs";
-
-const LIMITS = {
-  nombre: 80, descripcion: 400, instagram: 30, whatsapp: 15, ubicacion: 60, modalidad: 60,
-  categoria: 60, categoriaNombre: 40, categoriaEmoji: 16, subcategoria: 40
-};
-
-const clean = (v, n) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, n);
+// GET  /api/aportes  -> datos públicos: aportes aprobados + ediciones del admin a las fichas base
+// POST /api/aportes  -> propuesta de ficha nueva; queda PENDIENTE hasta que la apruebe el admin
+import { store, json, clean, readBody, limpiarFicha, newId, listAll } from "../lib/comun.mjs";
 
 export default async (req) => {
-  const store = getStore({ name: "aportes", consistency: "strong" });
-
   if (req.method === "GET") {
-    const { blobs } = await store.list();
-    const items = await Promise.all(blobs.map((b) => store.get(b.key, { type: "json" })));
-    const list = items.filter(Boolean).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
-    return Response.json(list, { headers: { "cache-control": "no-store" } });
+    const [aportes, ediciones] = await Promise.all([listAll(store("aportes")), listAll(store("ediciones"))]);
+    const publicos = aportes.filter((a) => a.estado === "aprobado").map(({ id, fecha, ...a }) => {
+      const f = limpiarFicha(a);
+      return { id, fecha, ...f, ...(a.oculta ? { oculta: true } : {}) };
+    }).filter((a) => !a.oculta);
+    return json({ aportes: publicos, ediciones });
   }
 
   if (req.method === "POST") {
-    let body;
-    try { body = await req.json(); } catch { return Response.json({ error: "Formato inválido" }, { status: 400 }); }
-    if (!body || typeof body !== "object") return Response.json({ error: "Formato inválido" }, { status: 400 });
-    if (body.sitio) return Response.json({ ok: true }); // honeypot anti-spam
+    const body = await readBody(req);
+    if (!body) return json({ error: "Formato inválido" }, 400);
+    if (body.sitio) return json({ ok: true }); // honeypot anti-spam
 
-    const item = {};
-    for (const [k, n] of Object.entries(LIMITS)) item[k] = clean(body[k], n);
-    item.instagram = item.instagram.replace(/^@/, "").replace(/[^A-Za-z0-9._]/g, "");
-    item.whatsapp = item.whatsapp.replace(/\D/g, "");
-    item.categoria = item.categoria.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    const f = limpiarFicha(body);
+    const categoria = clean(body.categoria, 60).toLowerCase().replace(/[^a-z0-9-]/g, "");
+    if (!f.nombre || !f.descripcion || !categoria) return json({ error: "Faltan nombre, descripción o categoría" }, 400);
+    if (!f.instagram && f.whatsapp.length < 8) return json({ error: "Deja al menos un contacto (WhatsApp o Instagram)" }, 400);
 
-    if (!item.nombre || !item.descripcion || !item.categoria) {
-      return Response.json({ error: "Faltan nombre, descripción o categoría" }, { status: 400 });
-    }
-    if (!item.instagram && item.whatsapp.length < 8) {
-      return Response.json({ error: "Deja al menos un contacto (WhatsApp o Instagram)" }, { status: 400 });
-    }
-
-    item.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    item.fecha = new Date().toISOString();
-    await store.setJSON(item.id, item);
-    return Response.json(item, { status: 201 });
+    const item = {
+      ...f,
+      cats: [{ c: categoria, s: clean(body.subcategoria, 50) }],
+      categoriaNombre: clean(body.categoriaNombre, 40),
+      categoriaEmoji: clean(body.categoriaEmoji, 16),
+      id: newId(), fecha: new Date().toISOString(), estado: "pendiente",
+    };
+    await store("aportes").setJSON(item.id, item);
+    return json({ ok: true, pendiente: true }, 201);
   }
 
   return new Response("Método no permitido", { status: 405 });

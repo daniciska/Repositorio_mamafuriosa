@@ -24,13 +24,25 @@ Sube los pantallazos nuevos a la carpeta `capturas/`. Luego se transcriben a
 El nombre de cada ficha es el que la persona dio en su comentario; si no dio uno, se muestra su @usuario.
 Los links de Instagram salen del @usuario tal como aparece en la captura.
 
+## Cómo funciona
+
+- **Público:** cualquiera ve las fichas, puede **proponer** sus datos (quedan pendientes) y **solicitar un cambio**
+  sobre una ficha (nombre, mail, razón y descripción). Nadie puede publicar, editar ni borrar directamente.
+- **Admin (`/admin`):** con la clave de administración se aprueban/rechazan aportes (con opción de editarlos antes),
+  se revisan las solicitudes de cambio y se editan, ocultan o eliminan fichas.
+
+| Archivo | Para qué |
+|---|---|
+| `modelo.js` | Une datos base + ediciones del admin + aportes aprobados |
+| `admin.html`, `admin.js` | Panel de administración |
+| `netlify/functions/aportes.mjs` | `GET` datos públicos · `POST` propuesta (queda pendiente) |
+| `netlify/functions/solicitudes.mjs` | `POST` solicitud de cambio |
+| `netlify/functions/admin.mjs` | API del panel (requiere la clave) |
+
 ## Publicar
 
-El sitio está pensado para Netlify: conectar este repo en Netlify (sin comando de build,
-carpeta de publicación `.`). Así funciona el botón **＋ Súmate** para que cualquiera agregue
-sus datos o cree una categoría nueva, y todos lo vean al instante.
+Sitio en Netlify (sin comando de build, carpeta de publicación `.`). Los datos se guardan en Netlify Blobs
+(stores `aportes`, `solicitudes`, `ediciones`).
 
-Abierta como archivo local (o en un hosting sin la función), la app muestra los datos base
-y lo agregado queda guardado solo en ese dispositivo.
-
-Los aportes se pueden revisar o borrar desde Netlify → *Blobs* → store `aportes`.
+La clave del panel **no está en el código**: se configura como variable de entorno secreta `ADMIN_PASSWORD`
+en Netlify → Project configuration → Environment variables. Para cambiarla, edita esa variable y vuelve a desplegar.

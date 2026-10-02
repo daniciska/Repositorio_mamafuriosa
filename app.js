@@ -2,8 +2,7 @@
   "use strict";
 
   const API = "/api/aportes";
-  const LOCAL_KEY = "mf-aportes-locales";
-  const PALETTE = ["#B98CFF", "#FF9EC7", "#7FD3FF", "#FFC86B", "#8EE3B5", "#FF8F70", "#A8E06A", "#6FE0D2", "#FFD95E", "#C9A2FF"];
+  const API_SOL = "/api/solicitudes";
   const EMOJIS = ["✨", "🐾", "🏠", "💇‍♀️", "💅", "🚗", "🧹", "💻", "🧘‍♀️", "🎂", "🌸", "🎉", "🪴", "🧵", "🩺", "💼"];
   const NEW_CAT = "__nueva__";
   const NEW_SUB = "__nueva_sub__";
@@ -13,18 +12,17 @@
     cats: $("#cats"), list: $("#list"), q: $("#q"), sub: $("#sub"), subWrap: $("#sub-wrap"),
     clear: $("#clear"), title: $("#results-title"), count: $("#results-count"),
     dialog: $("#form-dialog"), form: $("#form"), msg: $("#form-msg"), toast: $("#toast"),
-    newCat: $("#new-cat"), newSub: $("#new-sub"), emojiPick: $("#emoji-pick")
+    newCat: $("#new-cat"), newSub: $("#new-sub"), emojiPick: $("#emoji-pick"),
+    solDialog: $("#sol-dialog"), solForm: $("#sol-form"), solMsg: $("#sol-msg")
   };
 
-  const state = { cat: null, sub: "", q: "", remoteOk: false };
+  const state = { cat: null, sub: "", q: "" };
   let categorias = [];
   let personas = [];
-  let aportes = [];
+  let remoto = { aportes: [], ediciones: [] };
 
   // ---------- helpers ----------
-  const slug = (s) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "otra";
-  const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const { norm, slug } = window.MF;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const cleanIg = (s) => String(s || "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/^@/, "").replace(/[^A-Za-z0-9._]/g, "").slice(0, 30);
   const cleanPhone = (s) => {
@@ -38,6 +36,7 @@
   const safeUrl = (u) => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ""; } catch { return ""; } };
   const initials = (n) => n.replace(/[^\p{L}\s]/gu, " ").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "💜";
   const catById = (id) => categorias.find((c) => c.id === id);
+  const tituloDe = (p) => (p.nombre || "").trim() || (cleanIg(p.instagram) ? "@" + cleanIg(p.instagram) : "Sin nombre");
 
   function toast(text) {
     els.toast.textContent = text;
@@ -46,60 +45,23 @@
     toast.t = setTimeout(() => els.toast.classList.remove("show"), 3200);
   }
 
-  function readLocal() {
-    try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); } catch { return []; }
-  }
-  function writeLocal(arr) {
-    try { localStorage.setItem(LOCAL_KEY, JSON.stringify(arr)); } catch { /* sin almacenamiento */ }
-  }
-
   // ---------- data ----------
   function build() {
-    categorias = window.CATEGORIAS.map((c) => ({ ...c, subs: [...c.subs], custom: false }));
-    personas = window.DATOS.map((p, i) => ({ ...p, id: "base-" + i }));
-
-    for (const a of aportes) {
-      let cat = catById(a.categoria);
-      if (!cat && a.categoriaNombre) {
-        cat = categorias.find((c) => norm(c.nombre) === norm(a.categoriaNombre));
-      }
-      if (!cat) {
-        cat = {
-          id: a.categoria || slug(a.categoriaNombre || "otra"),
-          nombre: a.categoriaNombre || "Otra",
-          emoji: a.categoriaEmoji || "✨",
-          color: PALETTE[categorias.length % PALETTE.length],
-          desc: "Creada por la comunidad",
-          subs: [], custom: true
-        };
-        categorias.push(cat);
-      }
-      const sub = (a.subcategoria || "").trim();
-      if (sub && !cat.subs.some((s) => norm(s) === norm(sub))) cat.subs.push(sub);
-      const subFinal = sub ? cat.subs.find((s) => norm(s) === norm(sub)) : "";
-      personas.push({
-        id: a.id, nombre: a.nombre, instagram: a.instagram, whatsapp: a.whatsapp,
-        descripcion: a.descripcion, ubicacion: a.ubicacion, modalidad: a.modalidad,
-        local: !!a.local, nuevo: true,
-        cats: [{ c: cat.id, s: subFinal }]
-      });
-    }
+    ({ categorias, personas } = window.MF.construir(remoto));
   }
 
   async function load() {
     build();
     renderAll();
-    let remote = [];
     try {
       const r = await fetch(API, { headers: { accept: "application/json" } });
       if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
-        remote = await r.json();
-        state.remoteOk = true;
+        const j = await r.json();
+        remoto = { aportes: Array.isArray(j.aportes) ? j.aportes : [], ediciones: Array.isArray(j.ediciones) ? j.ediciones : [] };
+        build();
+        renderAll();
       }
     } catch { /* sitio sin backend (por ejemplo, abierto como archivo) */ }
-    aportes = [...(Array.isArray(remote) ? remote : []), ...readLocal().map((a) => ({ ...a, local: true }))];
-    build();
-    renderAll();
   }
 
   // ---------- render ----------
@@ -153,7 +115,7 @@
     const subs = [...new Set(p.cats.map((x) => x.s || catById(x.c)?.nombre).filter(Boolean))];
     const ig = cleanIg(p.instagram);
     const wa = cleanPhone(p.whatsapp);
-    const titulo = (p.nombre || "").trim() || (ig ? "@" + ig : "Sin nombre");
+    const titulo = tituloDe(p);
     const showHandle = ig && titulo !== "@" + ig;
     const web = safeUrl(p.web || "");
     const msg = encodeURIComponent("¡Hola! Te encontré en la Comunidad Mama Furiosa 💜");
@@ -180,7 +142,7 @@
         ${(p.otrosInstagram || []).map(cleanIg).filter(Boolean).map((h) => `<a class="cbtn ig2" href="https://www.instagram.com/${esc(h)}/" target="_blank" rel="noopener">${ICON_IG} @${esc(h)}</a>`).join("")}
         ${web ? `<a class="cbtn web" href="${esc(web)}" target="_blank" rel="noopener">${ICON_WEB} Web</a>` : ""}
       </div>
-      ${p.local ? `<div class="local-note">Guardado solo en este dispositivo</div>` : ""}
+      <button class="report" type="button" data-report="${esc(p.id)}">⚑ Solicitar un cambio</button>
     </article>`;
   }
 
@@ -314,35 +276,67 @@
     };
 
     const btn = els.form.querySelector('button[type="submit"]');
-    btn.disabled = true; btn.textContent = "Publicando…";
-    let saved = null;
+    btn.disabled = true; btn.textContent = "Enviando…";
+    let ok = false, error = "";
     try {
       const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(aporte) });
-      if (r.ok) saved = await r.json();
-      else if (r.status === 400) {
-        const j = await r.json().catch(() => ({}));
-        btn.disabled = false; btn.textContent = "Publicar 💜";
-        return fail(j.error || "Revisa los datos e intenta de nuevo");
-      }
-    } catch { /* sin backend */ }
-    btn.disabled = false; btn.textContent = "Publicar 💜";
-
-    if (saved) {
-      aportes.unshift(saved);
-      toast("¡Listo! Ya eres parte de la comunidad 💜");
-    } else {
-      const local = { ...aporte, id: "local-" + Date.now(), fecha: new Date().toISOString() };
-      delete local.sitio;
-      const arr = readLocal(); arr.unshift(local); writeLocal(arr);
-      aportes.unshift({ ...local, local: true });
-      toast("Guardado en este dispositivo (sin conexión al servidor)");
-    }
+      if (r.ok) ok = true;
+      else error = (await r.json().catch(() => ({}))).error || "";
+    } catch { /* sin conexión */ }
+    btn.disabled = false; btn.textContent = "Enviar 💜";
+    if (!ok) return fail(error || "No pudimos enviar tus datos. Revisa tu conexión e intenta de nuevo.");
     closeForm();
-    build();
-    state.cat = catById(categoria) ? categoria : null;
-    state.sub = ""; state.q = ""; els.q.value = "";
-    renderAll();
-    document.querySelector(".results").scrollIntoView({ behavior: "smooth", block: "start" });
+    toast("¡Gracias! Revisaremos tus datos y pronto aparecerán publicados 💜");
+  });
+
+  // ---------- solicitar un cambio ----------
+  const sf = els.solForm.elements;
+  function fillFichas(selected) {
+    const ord = [...personas].sort((x, y) => tituloDe(x).localeCompare(tituloDe(y), "es"));
+    sf.fichaId.innerHTML = `<option value="">Elige el dato a corregir…</option>` +
+      ord.map((p) => `<option value="${esc(p.id)}">${esc(tituloDe(p))}${p.nombre && p.instagram ? " (@" + esc(cleanIg(p.instagram)) + ")" : ""}</option>`).join("");
+    sf.fichaId.value = selected || "";
+  }
+  function openSol(fichaId) {
+    els.solForm.reset();
+    els.solMsg.textContent = ""; els.solMsg.className = "form-msg";
+    fillFichas(fichaId);
+    if (typeof els.solDialog.showModal === "function") els.solDialog.showModal(); else els.solDialog.setAttribute("open", "");
+  }
+  const closeSol = () => (els.solDialog.close ? els.solDialog.close() : els.solDialog.removeAttribute("open"));
+  document.addEventListener("click", (e) => {
+    const r = e.target.closest("[data-report]");
+    if (r) openSol(r.dataset.report);
+    if (e.target.closest("[data-open-sol]")) openSol("");
+    if (e.target.closest("[data-close-sol]")) closeSol();
+  });
+  els.solDialog.addEventListener("click", (e) => { if (e.target === els.solDialog) closeSol(); });
+
+  els.solForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const solFail = (t, field) => { els.solMsg.textContent = t; els.solMsg.className = "form-msg err"; if (field) field.focus(); };
+    const data = {
+      nombre: sf.nombre.value.trim(), email: sf.email.value.trim(), fichaId: sf.fichaId.value,
+      razon: sf.razon.value, descripcion: sf.descripcion.value.trim(), sitio: sf.sitio.value
+    };
+    if (!data.nombre) return solFail("Falta tu nombre", sf.nombre);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return solFail("Escribe un mail válido", sf.email);
+    if (!data.fichaId) return solFail("Elige a qué dato corresponde", sf.fichaId);
+    if (!data.razon) return solFail("Elige la razón del cambio", sf.razon);
+    if (!data.descripcion) return solFail("Cuéntanos qué hay que cambiar", sf.descripcion);
+    const p = personas.find((x) => x.id === data.fichaId);
+    data.fichaNombre = p ? tituloDe(p) + (p.instagram ? " (@" + cleanIg(p.instagram) + ")" : "") : "";
+    const btn = els.solForm.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    let ok = false, error = "";
+    try {
+      const r = await fetch(API_SOL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+      if (r.ok) ok = true; else error = (await r.json().catch(() => ({}))).error || "";
+    } catch { /* sin conexión */ }
+    btn.disabled = false;
+    if (!ok) return solFail(error || "No pudimos enviar la solicitud. Intenta de nuevo.");
+    closeSol();
+    toast("Solicitud enviada. La revisaremos pronto 🙌");
   });
 
   load();
