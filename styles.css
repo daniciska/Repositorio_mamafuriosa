@@ -8,10 +8,28 @@
   --bg: #FBF6FF;
   --card: #FFFFFF;
   --line: #EADCF8;
+  --dot: #E9D9FB;
+  --soft: #F3EAFE;
+  --soft-2: #F6EEFF;
+  --tint-shadow: var(--tint-shadow);
+  --backdrop: rgba(40, 14, 80, .55);
   --yellow: #FFD95E;
   --green: #25D366;
   --radius: 22px;
   --shadow: 0 6px 0 rgba(26, 16, 38, .08), 0 14px 30px rgba(106, 43, 196, .10);
+}
+
+/* Tonos claros derivados del color de la marca (navegadores sin color-mix usan los valores de arriba) */
+@supports (color: color-mix(in srgb, red 50%, white)) {
+  :root {
+    --bg: color-mix(in srgb, var(--purple) 4%, #fff);
+    --line: color-mix(in srgb, var(--purple) 15%, #fff);
+    --dot: color-mix(in srgb, var(--purple) 16%, #fff);
+    --soft: color-mix(in srgb, var(--purple) 9%, #fff);
+    --soft-2: color-mix(in srgb, var(--purple) 7%, #fff);
+    --tint-shadow: color-mix(in srgb, var(--purple) 10%, transparent);
+    --backdrop: color-mix(in srgb, var(--purple-dark) 60%, rgba(0, 0, 0, .5));
+  }
 }
 
 * { box-sizing: border-box; }
@@ -22,7 +40,7 @@ body {
   font-family: "Jost", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--ink);
   background: var(--bg);
-  background-image: radial-gradient(#E9D9FB 1.2px, transparent 1.2px);
+  background-image: radial-gradient(var(--dot) 1.2px, transparent 1.2px);
   background-size: 22px 22px;
   line-height: 1.45;
   overflow-x: hidden;
@@ -115,11 +133,11 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
   display: flex; flex-direction: column; gap: 6px; min-height: 150px;
 }
 .cat:hover { transform: translateY(-3px) rotate(-.6deg); }
-.cat.active { border-color: var(--purple); background: #F6EEFF; }
+.cat.active { border-color: var(--purple); background: var(--soft-2); }
 .cat-icon {
   width: 58px; height: 58px; display: grid; place-items: center; font-size: 30px;
   border-radius: 46% 54% 58% 42% / 52% 44% 56% 48%;
-  background: var(--c, #E9D9FB);
+  background: var(--c, var(--dot));
   box-shadow: inset 0 -5px 0 rgba(0,0,0,.08);
 }
 .cat:hover .cat-icon { animation: wiggle .5s ease; }
@@ -167,7 +185,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .tag {
   font-size: .78rem; font-weight: 600; padding: 3px 10px; border-radius: 999px;
-  background: #F3EAFE; color: var(--purple-dark);
+  background: var(--soft); color: var(--purple-dark);
 }
 .tag.place { background: #FFF5D6; color: #7A5600; }
 .contact { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
@@ -217,7 +235,7 @@ dialog {
   max-height: calc(100dvh - 24px); background: #fff; color: var(--ink);
   box-shadow: 0 20px 60px rgba(26,16,38,.35);
 }
-dialog::backdrop { background: rgba(40, 14, 80, .55); backdrop-filter: blur(3px); }
+dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(3px); }
 #form, #sol-form, #edit-form { padding: 22px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
 .form-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .form-head h2 { margin: 0; font-size: 1.45rem; }
@@ -238,7 +256,7 @@ dialog::backdrop { background: rgba(40, 14, 80, .55); backdrop-filter: blur(3px)
   font-size: 20px; width: 36px; height: 36px; border-radius: 10px; border: 2px solid transparent;
   background: #fff; cursor: pointer; padding: 0;
 }
-.emoji-pick button[aria-checked="true"] { border-color: var(--purple); background: #F3EAFE; }
+.emoji-pick button[aria-checked="true"] { border-color: var(--purple); background: var(--soft); }
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .form-msg { margin: 0; font-weight: 600; min-height: 1.2em; }
 .form-msg.err { color: var(--red); }
@@ -278,7 +296,7 @@ dialog::backdrop { background: rgba(40, 14, 80, .55); backdrop-filter: blur(3px)
 }
 .reco { font-size: .85rem; color: var(--ink-soft); }
 .reco a { font-weight: 700; }
-.cbtn.ig2 { background: #F3EAFE; color: var(--purple-dark); }
+.cbtn.ig2 { background: var(--soft); color: var(--purple-dark); }
 .report {
   align-self: flex-start; border: 0; background: none; padding: 2px 0; cursor: pointer;
   font: inherit; font-size: .8rem; font-weight: 600; color: var(--ink-soft);
