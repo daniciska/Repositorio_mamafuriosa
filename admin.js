@@ -367,6 +367,11 @@
     $("#edit-save").textContent = accion === "aprobar" ? "Guardar y aprobar" : "Guardar";
     $("#edit-msg").textContent = "";
     for (const k of ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad"]) ef[k].value = p[k] || "";
+    // Si la ficha no tiene región elegida, se propone la que se detecta del texto.
+    const det = window.MF_UBICACION.detectar(p);
+    const sugerida = p.region || (det.regiones.length === 1 ? det.regiones[0] : "");
+    ef.region.innerHTML = window.MF_UBICACION.opcionesRegion(sugerida, "Sin región");
+    ef.todoChile.checked = Boolean(p.todoChile) || det.todoChile;
     ef.otrosInstagram.value = (p.otrosInstagram || []).join(", ");
     $("#cat-rows").innerHTML = "";
     (p.cats && p.cats.length ? p.cats : [{ c: "", s: "" }]).forEach(catRow);
@@ -381,6 +386,7 @@
     const ficha = {
       nombre: ef.nombre.value, instagram: ef.instagram.value, descripcion: ef.descripcion.value,
       whatsapp: ef.whatsapp.value, web: ef.web.value, ubicacion: ef.ubicacion.value, modalidad: ef.modalidad.value,
+      region: ef.region.value, todoChile: ef.todoChile.checked,
       otrosInstagram: ef.otrosInstagram.value.split(/[,\s]+/).map(cleanIg).filter(Boolean), cats
     };
     const custom = cats.map((x) => catsEditor.find((c) => c.id === x.c)).find((c) => c && c.custom);

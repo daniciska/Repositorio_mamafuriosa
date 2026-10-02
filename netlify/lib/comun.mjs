@@ -37,7 +37,7 @@ export async function readBody(req) {
 }
 
 // Ficha pública: solo campos visibles, sin datos internos.
-export const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad"];
+export const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad", "region", "todoChile"];
 
 export function limpiarFicha(b) {
   const f = {
@@ -48,6 +48,8 @@ export function limpiarFicha(b) {
     web: cleanUrl(b.web),
     ubicacion: clean(b.ubicacion, 80),
     modalidad: clean(b.modalidad, 80),
+    region: clean(b.region, 20).toLowerCase().replace(/[^a-z]/g, ""),
+    todoChile: b.todoChile === true || b.todoChile === "true",
   };
   if (Array.isArray(b.otrosInstagram)) f.otrosInstagram = b.otrosInstagram.map(cleanIg).filter(Boolean).slice(0, 6);
   if (Array.isArray(b.cats)) {

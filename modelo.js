@@ -5,7 +5,7 @@
   const PALETTE = ["#B98CFF", "#FF9EC7", "#7FD3FF", "#FFC86B", "#8EE3B5", "#FF8F70", "#A8E06A", "#6FE0D2", "#FFD95E", "#C9A2FF"];
   const norm = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const slug = (s) => norm(s).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "otra";
-  const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad", "otrosInstagram", "cats"];
+  const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad", "region", "todoChile", "otrosInstagram", "cats"];
 
   function construir({ aportes = [], ediciones = [], incluirOcultas = false } = {}) {
     const categorias = window.CATEGORIAS.map((c) => ({ ...c, subs: [...c.subs], custom: false }));

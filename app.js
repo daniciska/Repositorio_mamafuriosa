@@ -135,6 +135,12 @@
   const ICON_IG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="17.3" cy="6.7" r="1.3" fill="currentColor"/></svg>';
   const ICON_WEB = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
 
+  function lugarTag(p) {
+    const region = p.region && p.region !== UBI.ONLINE ? UBI.nombreRegion(p.region) : "";
+    const partes = [p.ubicacion, region && !norm(p.ubicacion).includes(norm(region)) ? region : ""].filter(Boolean);
+    return partes.length ? `<span class="tag place">📍 ${esc(partes.join(", "))}</span>` : "";
+  }
+
   function card(p) {
     const first = catById(p.cats[0]?.c);
     const color = (state.cat && catById(state.cat)?.color) || first?.color || "#E59BE8";
@@ -158,7 +164,7 @@
       ${p.recomendadaPor ? `<div class="reco">💬 Recomendada por <a href="https://www.instagram.com/${esc(cleanIg(p.recomendadaPor))}/" target="_blank" rel="noopener">@${esc(cleanIg(p.recomendadaPor))}</a></div>` : ""}
       <div class="tags">
         ${subs.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}
-        ${p.ubicacion ? `<span class="tag place">📍 ${esc(p.ubicacion)}</span>` : ""}
+        ${lugarTag(p)}
         ${p.modalidad ? `<span class="tag place">🛵 ${esc(p.modalidad)}</span>` : ""}
       </div>
       ${wa ? `<div class="phone">📞 ${esc(prettyPhone(wa))}</div>` : ""}
@@ -266,6 +272,7 @@
     els.form.reset();
     els.msg.textContent = ""; els.msg.className = "form-msg";
     fillCatSelect(state.cat);
+    f.region.innerHTML = UBI.opcionesRegion(state.lugar || "", "Elige tu región…");
     if (typeof els.dialog.showModal === "function") els.dialog.showModal();
     else els.dialog.setAttribute("open", "");
     setTimeout(() => f.nombre.focus(), 50);
@@ -306,11 +313,13 @@
       categoriaNombre = catById(categoria)?.nombre || "";
     }
     if (f.subcategoria.value === NEW_SUB && !subcategoria) return fail("Escribe la nueva subcategoría", f.nuevaSubcategoria);
+    if (!f.region.value) return fail("Elige tu región (o \"Solo online\" si no atiendes en un lugar fijo)", f.region);
     if (!instagram && whatsapp.length < 8) return fail("Deja al menos un contacto: WhatsApp o Instagram", f.whatsapp);
 
     const aporte = {
       nombre, descripcion, instagram, whatsapp,
       ubicacion: f.ubicacion.value.trim(), modalidad: f.modalidad.value.trim(),
+      region: f.region.value, todoChile: f.todoChile.checked,
       categoria, categoriaNombre, categoriaEmoji, subcategoria, sitio: f.sitio.value
     };
 

@@ -325,3 +325,4 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(3px); }
   color: var(--ink-soft); padding: 10px 2px; cursor: pointer;
 }
 .chk-online input { width: 18px; height: 18px; accent-color: var(--purple); }
+.chk-form { padding: 0 2px; margin-top: -4px; }

@@ -115,8 +115,12 @@
       <label class="field"><span>Web</span><input name="web" maxlength="200"></label>
     </div>
     <div class="grid-2">
-      <label class="field"><span>Ubicación</span><input name="ubicacion" maxlength="80"></label>
+      <label class="field"><span>Región</span><select name="region"></select></label>
+      <label class="field"><span>Comuna / ciudad</span><input name="ubicacion" maxlength="80"></label>
+    </div>
+    <div class="grid-2">
       <label class="field"><span>Modalidad</span><input name="modalidad" maxlength="80"></label>
+      <label class="chk" style="padding-top:22px"><input type="checkbox" name="todoChile"> Atiende online o envía a todo Chile</label>
     </div>
     <div class="field">
       <span>Categorías</span>
@@ -135,6 +139,7 @@
 
 <script src="datos.js"></script>
 <script src="modelo.js"></script>
+<script src="ubicacion.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

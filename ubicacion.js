@@ -53,18 +53,33 @@
     texto: patron(r.claves.filter((c) => !(r.soloUbicacion || []).includes(c) && !/\bregion$/.test(c) && c !== "rm"))
   }));
   const RX_TODO = patron(TODO_CHILE);
+  const IDS = REGIONES.map((r) => r.id);
+  const ONLINE = "online";
 
   // Devuelve { regiones: [ids], todoChile: bool } para una ficha.
   function detectar(p) {
     const lugar = norm([p.ubicacion, p.modalidad].join(" · "));
+    const textoTodoChile = RX_TODO.test(lugar) || RX_TODO.test(norm(p.descripcion));
+    // Región elegida explícitamente (formulario o panel admin): manda sobre lo escrito.
+    if (p.region === ONLINE) return { regiones: [], todoChile: true };
+    if (p.region && IDS.includes(p.region)) return { regiones: [p.region], todoChile: Boolean(p.todoChile) || textoTodoChile };
     let regiones = RX.filter((r) => r.total.test(lugar)).map((r) => r.id);
     if (!regiones.length) {
       const desc = norm(p.descripcion);
       regiones = RX.filter((r) => r.texto.test(desc)).map((r) => r.id);
     }
-    const todoChile = RX_TODO.test(lugar) || RX_TODO.test(norm(p.descripcion));
-    return { regiones, todoChile };
+    return { regiones, todoChile: Boolean(p.todoChile) || textoTodoChile };
   }
 
-  window.MF_UBICACION = { REGIONES: REGIONES.map(({ id, nombre }) => ({ id, nombre })), detectar };
+  const nombreRegion = (id) => (REGIONES.find((r) => r.id === id) || {}).nombre || "";
+
+  // <option>s para un <select> de región (formulario público y editor del panel).
+  function opcionesRegion(elegida, textoVacio) {
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    return `<option value="">${esc(textoVacio)}</option>` +
+      REGIONES.map((r) => `<option value="${r.id}"${r.id === elegida ? " selected" : ""}>${esc(r.nombre)}</option>`).join("") +
+      `<option value="${ONLINE}"${elegida === ONLINE ? " selected" : ""}>Solo online / sin región fija</option>`;
+  }
+
+  window.MF_UBICACION = { REGIONES: REGIONES.map(({ id, nombre }) => ({ id, nombre })), detectar, nombreRegion, opcionesRegion, ONLINE };
 })();

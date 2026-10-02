@@ -148,14 +148,23 @@
 
     <div class="grid-2">
       <label class="field">
-        <span>¿Desde dónde?</span>
-        <input name="ubicacion" maxlength="60" placeholder="Comuna / ciudad">
+        <span>Región *</span>
+        <select name="region" required></select>
       </label>
       <label class="field">
-        <span>Modalidad</span>
-        <input name="modalidad" maxlength="60" placeholder="Online, presencial, envíos…">
+        <span>Comuna / ciudad</span>
+        <input name="ubicacion" maxlength="60" placeholder="Ej: Ñuñoa, Viña del Mar">
       </label>
     </div>
+
+    <label class="chk-online chk-form">
+      <input type="checkbox" name="todoChile"> También atiendo online o hago envíos a todo Chile
+    </label>
+
+    <label class="field">
+      <span>Modalidad</span>
+      <input name="modalidad" maxlength="60" placeholder="Online, presencial, a domicilio, envíos…">
+    </label>
 
     <label class="field hp" aria-hidden="true">
       <span>No llenar</span>
