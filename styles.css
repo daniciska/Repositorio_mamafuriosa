@@ -291,3 +291,12 @@ dialog::backdrop { background: rgba(40, 14, 80, .55); backdrop-filter: blur(3px)
 }
 .autora p { margin: 4px 0; }
 .autora a { font-weight: 700; }
+
+/* ---------- textos largos (links, @usuarios) sin desbordar en celular ---------- */
+.list > * { min-width: 0; }
+.card p.desc, .handle, .tag, .reco, .item p, .meta { overflow-wrap: anywhere; }
+.cbtn { max-width: 100%; }
+.cbtn span, .cbtn { overflow-wrap: anywhere; }
+@media (max-width: 560px) { .list { grid-template-columns: minmax(0, 1fr); } }
+.card-top > div { min-width: 0; }
+.card h3 { overflow-wrap: anywhere; }
