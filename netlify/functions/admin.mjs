@@ -7,7 +7,7 @@
 //   eliminar                  {id}           borra un aporte (las fichas base solo se ocultan)
 //   resolver | descartar      {id}           solicitud de cambio
 //   ig-iniciar | ig-medios | ig-elegir {mediaId, permalink, caption, desde} | ig-sincronizar | ig-desconectar
-import { store, json, readBody, limpiarFicha, listAll, esAdmin } from "../lib/comun.mjs";
+import { store, json, readBody, limpiarFicha, listAll, esAdmin, tokenFicha, clean } from "../lib/comun.mjs";
 import * as instagram from "../lib/instagram.mjs";
 
 const espera = () => new Promise((r) => setTimeout(r, 800));
@@ -22,11 +22,50 @@ export default async (req) => {
   if (req.method === "GET") {
     const [a, s, e] = await Promise.all([listAll(aportes), listAll(solicitudes), listAll(ediciones)]);
     const porFecha = (x, y) => String(y.fecha).localeCompare(String(x.fecha));
-    return json({ aportes: a.sort(porFecha), solicitudes: s.sort(porFecha), ediciones: e, instagram: await instagram.estado() });
+    const [r, c] = await Promise.all([listAll(store("regiones")), listAll(store("contactos"))]);
+    return json({ aportes: a.sort(porFecha), solicitudes: s.sort(porFecha), ediciones: e, instagram: await instagram.estado(),
+      regiones: r.sort(porFecha), contactos: c });
   }
   if (req.method !== "POST") return new Response("Método no permitido", { status: 405 });
 
   const b = await readBody(req);
+  if (String(b?.accion || "").startsWith("region-")) {
+    const regiones = store("regiones");
+    switch (b.accion) {
+      case "region-tokens": {
+        const ids = (Array.isArray(b.ids) ? b.ids : []).slice(0, 2000).map((x) => clean(x, 120));
+        return json({ tokens: Object.fromEntries(ids.map((id) => [id, tokenFicha(id)])) });
+      }
+      case "region-contactado": {
+        const fichaId = clean(b.id, 120);
+        if (!fichaId) return json({ error: "Falta id" }, 400);
+        if (b.valor === false) await store("contactos").delete(fichaId);
+        else await store("contactos").setJSON(fichaId, { id: fichaId, fecha: new Date().toISOString() });
+        return json({ ok: true });
+      }
+      case "region-aplicar":
+      case "region-descartar": {
+        const p = await regiones.get(String(b.id || ""), { type: "json" });
+        if (!p) return json({ error: "No existe" }, 404);
+        if (b.accion === "region-aplicar") {
+          const cambios = { region: p.region, todoChile: p.todoChile || p.region === "online", ...(p.ubicacion ? { ubicacion: p.ubicacion } : {}) };
+          if (p.fichaId.startsWith("base:")) {
+            const ediciones = store("ediciones");
+            const prev = (await ediciones.get(p.fichaId, { type: "json" })) || {};
+            await ediciones.setJSON(p.fichaId, { ...prev, ...cambios, id: p.fichaId, editado: new Date().toISOString() });
+          } else {
+            const aportes = store("aportes");
+            const a = await aportes.get(p.fichaId, { type: "json" });
+            if (!a) return json({ error: "La ficha ya no existe" }, 404);
+            await aportes.setJSON(p.fichaId, { ...a, ...cambios, editado: new Date().toISOString() });
+          }
+        }
+        await regiones.setJSON(p.id, { ...p, estado: b.accion === "region-aplicar" ? "aplicada" : "descartada", revisado: new Date().toISOString() });
+        return json({ ok: true });
+      }
+      default: return json({ error: "Acción desconocida" }, 400);
+    }
+  }
   if (String(b?.accion || "").startsWith("ig-")) {
     try {
       switch (b.accion) {

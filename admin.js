@@ -67,7 +67,7 @@
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
     tab = b.dataset.tab;
     document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b));
-    ["pendientes", "solicitudes", "fichas", "instagram"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
+    ["pendientes", "solicitudes", "fichas", "instagram", "regiones"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
   }));
 
   function catsTexto(p, cats) {
@@ -143,6 +143,7 @@
 
     renderFichas();
     renderInstagram();
+    renderRegiones();
   }
 
   function renderFichas() {
@@ -334,6 +335,153 @@
       toast(q.get("ig") === "ok" ? "¡Instagram conectado! Ahora elige el post." : "No se pudo conectar: " + (q.get("msg") || ""));
     }, 600);
   })();
+
+  // ---------- regiones: pedir a cada persona que complete su región ----------
+  const UBI = window.MF_UBICACION;
+  const PLANTILLA_KEY = "mf-plantilla-region";
+  const sitio = document.title.replace(/^Admin · /, "");
+  const PLANTILLA = "¡Hola {nombre}! 💜 Te escribo de {sitio}, el directorio que armamos con los datos que compartiste en los comentarios. " +
+    "Tu ficha ya está publicada, pero nos falta saber en qué región estás para que te encuentren al filtrar por ubicación. " +
+    "¿Me ayudas? Es solo un clic 👉 {enlace} ¡Gracias!";
+  let tokens = {};
+  let pidiendoTokens = false;
+  let filtroReg = "sin";
+  const leerPlantilla = () => { try { return localStorage.getItem(PLANTILLA_KEY) || PLANTILLA; } catch { return PLANTILLA; } };
+  const enlaceFicha = (p) => tokens[p.id] ? `${location.origin}/region?f=${encodeURIComponent(p.id)}&t=${tokens[p.id]}` : "";
+  const mensajeFicha = (p) => leerPlantilla().replaceAll("{nombre}", (p.nombre || "").trim() || "@" + cleanIg(p.instagram))
+    .replaceAll("{sitio}", sitio).replaceAll("{enlace}", enlaceFicha(p));
+  const estadoUbic = (p) => {
+    if (p.region) return "confirmada";
+    const d = UBI.detectar(p);
+    return d.regiones.length || d.todoChile ? "adivinada" : "sin";
+  };
+
+  async function asegurarTokens(ids) {
+    const faltan = ids.filter((id) => !tokens[id]);
+    if (!faltan.length || pidiendoTokens) return;
+    pidiendoTokens = true;
+    try { Object.assign(tokens, (await api("POST", { accion: "region-tokens", ids: faltan })).tokens); }
+    finally { pidiendoTokens = false; }
+    renderRegiones();
+  }
+
+  function renderRegiones() {
+    const props = (datos.regiones || []).filter((r) => r.estado === "pendiente");
+    const contactos = Object.fromEntries((datos.contactos || []).map((c) => [c.id, c.fecha]));
+    const respondio = new Set(props.map((r) => r.fichaId));
+    // Las cuentas recomendadas por otras no comentaron ellas mismas: no se les escribe.
+    const sinRegion = modelo.personas.filter((p) => !p.oculta && !p.recomendadaPor && estadoUbic(p) !== "confirmada");
+    const grupos = {
+      sin: sinRegion.filter((p) => estadoUbic(p) === "sin" && !contactos[p.id]),
+      adivinada: sinRegion.filter((p) => estadoUbic(p) === "adivinada" && !contactos[p.id]),
+      contactadas: sinRegion.filter((p) => contactos[p.id])
+    };
+    $("#b-reg").textContent = props.length || "";
+    const lista = grupos[filtroReg] || [];
+    asegurarTokens(lista.map((p) => p.id));
+    const nombreReg = (r) => (r.region === "online" ? "Solo online" : UBI.nombreRegion(r.region)) + (r.ubicacion ? ` (${r.ubicacion})` : "") + (r.todoChile && r.region !== "online" ? " · también online/envíos" : "");
+    const verificadas = props.filter((r) => r.verificado);
+    const enlaceGeneral = location.origin + "/region";
+    const avisoTexto = `📍 ¿Estás en ${sitio}? Agrega tu región para que la comunidad te encuentre más fácil: ${enlaceGeneral}`;
+
+    $("#tab-regiones").innerHTML = `
+      <article class="item">
+        <h3>Respuestas recibidas ${props.length ? `<span class="pill">${props.length}</span>` : ""}</h3>
+        ${props.length ? `${verificadas.length > 1 ? `<div class="actions"><button class="btn btn-ok small-btn" data-reg-todas>✓ Aplicar las ${verificadas.length} que vienen de su link personal</button></div>` : ""}
+          ${props.map((r) => `<div class="fila">
+            <div class="quien"><b>${esc(((f) => (f ? titulo(f) : r.fichaNombre || r.fichaId))(modelo.personas.find((x) => x.id === r.fichaId)))}</b> → ${esc(nombreReg(r))}
+              <small>${esc(fecha(r.fecha))} · ${r.verificado ? "✓ desde su link personal" : "⚠ sin link personal: revisa que sea la persona correcta"}</small></div>
+            <div class="actions">
+              <button class="btn btn-ok" data-reg-act="region-aplicar" data-id="${esc(r.id)}">✓ Aplicar</button>
+              <button class="btn btn-no" data-reg-act="region-descartar" data-id="${esc(r.id)}">✕ Descartar</button>
+            </div></div>`).join("")}`
+        : `<p class="meta">Todavía no llegan respuestas. Aparecerán aquí para que las apliques con un clic.</p>`}
+      </article>
+
+      <article class="item">
+        <h3>Aviso para todas (historia o comentario fijado)</h3>
+        <p class="meta">Cualquiera puede entrar, buscar su ficha y elegir su región. Igual pasa por tu aprobación.</p>
+        <div class="copiar">${esc(avisoTexto)}</div>
+        <div class="actions">
+          <button class="btn btn-ghost small-btn" data-copiar="${esc(avisoTexto)}">Copiar texto</button>
+          <button class="btn btn-ghost small-btn" data-copiar="${esc(enlaceGeneral)}">Copiar solo el link</button>
+        </div>
+      </article>
+
+      <article class="item">
+        <h3>Pedírselo a cada persona</h3>
+        <p class="meta">Cada mensaje lleva un link personal. Copia, abre su Instagram, pega y envía; luego márcala como enviada.
+        Usa {nombre}, {sitio} y {enlace} en el mensaje.</p>
+        <textarea class="plantilla" id="plantilla" rows="4">${esc(leerPlantilla())}</textarea>
+        <div class="toolbar">
+          <label class="sub-select"><span>Mostrar</span>
+            <select id="filtro-reg">
+              <option value="sin">Sin ninguna ubicación (${grupos.sin.length})</option>
+              <option value="adivinada">Ubicación adivinada del texto, sin confirmar (${grupos.adivinada.length})</option>
+              <option value="contactadas">Ya contactadas (${grupos.contactadas.length})</option>
+            </select></label>
+        </div>
+        ${lista.length ? lista.map((p) => {
+          const ig = cleanIg(p.instagram);
+          const wa = String(p.whatsapp || "").replace(/\D/g, "");
+          const listo = Boolean(enlaceFicha(p));
+          return `<div class="fila ${contactos[p.id] ? "hecha" : ""}">
+            <div class="quien"><b>${esc(titulo(p))}</b>
+              <small>${[
+                p.nombre && ig ? "@" + esc(ig) : "",
+                estadoUbic(p) === "adivinada" ? "📍 " + esc(UBI.detectar(p).regiones.map(UBI.nombreRegion).join(", ") || "online") + " (adivinada)" : "",
+                contactos[p.id] ? "✓ enviado el " + esc(fecha(contactos[p.id])) : "",
+                respondio.has(p.id) ? "💬 respondió" : ""
+              ].filter(Boolean).join(" · ")}</small></div>
+            <div class="actions">
+              <button class="btn btn-ghost" data-copiar-msg="${esc(p.id)}" ${listo ? "" : "disabled"}>📋 Copiar mensaje</button>
+              ${ig ? `<a class="btn btn-ghost" href="https://ig.me/m/${esc(ig)}" target="_blank" rel="noopener">📸 Abrir su Instagram</a>` : ""}
+              ${wa ? `<a class="btn btn-ghost" data-wa="${esc(p.id)}" href="#" target="_blank" rel="noopener">💬 WhatsApp</a>` : ""}
+              <button class="btn ${contactos[p.id] ? "btn-ghost" : "btn-ok"}" data-contactado="${esc(p.id)}" data-valor="${contactos[p.id] ? "false" : "true"}">${contactos[p.id] ? "↺ Desmarcar" : "✓ Enviado"}</button>
+            </div></div>`;
+        }).join("") : `<p class="empty-msg">No hay personas en esta lista 🎉</p>`}
+      </article>`;
+    $("#filtro-reg").value = filtroReg;
+  }
+
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "filtro-reg") { filtroReg = e.target.value; renderRegiones(); }
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target.id === "plantilla") { try { localStorage.setItem(PLANTILLA_KEY, e.target.value); } catch { /* sin storage */ } }
+  });
+  async function copiar(texto, aviso) {
+    try { await navigator.clipboard.writeText(texto); toast(aviso); }
+    catch { window.prompt("Copia el texto:", texto); }
+  }
+  document.addEventListener("click", async (e) => {
+    const c = e.target.closest("[data-copiar]");
+    if (c) return copiar(c.dataset.copiar, "Copiado ✓");
+    const m = e.target.closest("[data-copiar-msg]");
+    if (m) return copiar(mensajeFicha(modelo.personas.find((p) => p.id === m.dataset.copiarMsg)), "Mensaje copiado. Pégalo en su chat 💜");
+    const w = e.target.closest("[data-wa]");
+    if (w) {
+      const p = modelo.personas.find((x) => x.id === w.dataset.wa);
+      w.href = `https://wa.me/${String(p.whatsapp).replace(/\D/g, "")}?text=${encodeURIComponent(mensajeFicha(p))}`;
+      return; // el enlace se abre con el texto ya escrito
+    }
+    const k = e.target.closest("[data-contactado]");
+    const r = e.target.closest("[data-reg-act]");
+    const todas = e.target.closest("[data-reg-todas]");
+    if (!k && !r && !todas) return;
+    const btn = k || r || todas;
+    btn.disabled = true;
+    try {
+      if (k) await api("POST", { accion: "region-contactado", id: k.dataset.contactado, valor: k.dataset.valor === "true" });
+      else if (r) { await api("POST", { accion: r.dataset.regAct, id: r.dataset.id }); toast(r.dataset.regAct === "region-aplicar" ? "Región aplicada" : "Respuesta descartada"); }
+      else {
+        const ids = (datos.regiones || []).filter((x) => x.estado === "pendiente" && x.verificado).map((x) => x.id);
+        for (const id of ids) await api("POST", { accion: "region-aplicar", id });
+        toast(`${ids.length} regiones aplicadas`);
+      }
+      await cargar();
+    } catch (err) { toast(err.message); btn.disabled = false; }
+  });
 
   // ---------- editor ----------
   const ef = $("#edit-form").elements;

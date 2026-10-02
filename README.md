@@ -40,11 +40,15 @@ Los links de Instagram salen del @usuario tal como aparece en la captura.
 | `netlify/functions/admin.mjs` | API del panel (requiere la clave) |
 | `netlify/lib/instagram.mjs`, `netlify/functions/instagram-*.mjs` | Conexión con Instagram y revisión automática de comentarios cada 6 h |
 | `docs/conectar-instagram.md` | Guía para conectar el post de Instagram |
+| `region.html`, `region.js`, `netlify/functions/region.mjs` | Página `/region` donde cada persona indica su región (link personal o búsqueda); llega como propuesta al panel |
 
 ## Publicar
 
 Sitio en Netlify (sin comando de build, carpeta de publicación `.`). Los datos se guardan en Netlify Blobs
-(stores `aportes`, `solicitudes`, `ediciones`, `instagram`).
+(stores `aportes`, `solicitudes`, `ediciones`, `instagram`, `regiones`, `contactos`).
+
+`LINK_SECRET` (secreta) firma los links personales de `/region`; si no existe se deriva de `ADMIN_PASSWORD`
+(y entonces los links cambiarían al cambiar la clave).
 
 La clave del panel **no está en el código**: se configura como variable de entorno secreta `ADMIN_PASSWORD`
 en Netlify → Project configuration → Environment variables. Para cambiarla, edita esa variable y vuelve a desplegar.

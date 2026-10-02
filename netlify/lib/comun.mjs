@@ -1,6 +1,6 @@
 // Utilidades compartidas por las funciones de la API.
 import { getStore, getDeployStore } from "@netlify/blobs";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 // Producción (y desarrollo local, que usa un store aislado) usan stores globales;
 // los deploy previews usan stores del deploy para no mezclar datos de prueba con los reales.
@@ -59,6 +59,24 @@ export function limpiarFicha(b) {
   if (b.categoriaEmoji) f.categoriaEmoji = clean(b.categoriaEmoji, 16);
   return f;
 }
+
+// Link personal para que cada persona complete datos de SU ficha (por ahora, la región).
+// Firma = HMAC del id de la ficha; sin el link correcto la propuesta llega igual, pero marcada "sin verificar".
+// LINK_SECRET (opcional) evita que los links cambien si se cambia la clave del admin.
+export function tokenFicha(id) {
+  const secreto = process.env.LINK_SECRET || "enlaces:" + (process.env.ADMIN_PASSWORD || "");
+  return createHmac("sha256", secreto).update(String(id)).digest("base64url").slice(0, 16);
+}
+
+export function tokenValido(id, token) {
+  const a = Buffer.from(tokenFicha(id));
+  const b = Buffer.from(String(token || ""));
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// Regiones válidas (mismas ids que ubicacion.js) + "online" (sin región fija).
+export const REGIONES = ["arica", "tarapaca", "antofagasta", "atacama", "coquimbo", "valparaiso", "metropolitana", "ohiggins",
+  "maule", "nuble", "biobio", "araucania", "losrios", "loslagos", "aysen", "magallanes", "extranjero", "online"];
 
 // Comparación de clave en tiempo constante. La clave vive en la variable de entorno ADMIN_PASSWORD.
 export function esAdmin(req) {

@@ -49,6 +49,14 @@
   .medio small { color: var(--ink-soft); display: block; margin-top: 6px; }
   .copiar { font-family: ui-monospace, monospace; font-size: .85rem; background: var(--bg); border-radius: 10px; padding: 8px 10px; overflow-wrap: anywhere; }
   .item ol { margin: 0; padding-left: 20px; }
+  .fila { background: #fff; border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; box-shadow: 0 2px 0 rgba(26,16,38,.05);
+    display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .fila .quien { min-width: 0; flex: 1 1 220px; overflow-wrap: anywhere; }
+  .fila .quien small { display: block; color: var(--ink-soft); }
+  .fila .actions .btn { padding: 6px 12px; font-size: .85rem; }
+  .fila.hecha { opacity: .6; }
+  a.btn { text-decoration: none; display: inline-block; }
+  textarea.plantilla { width: 100%; font: inherit; font-size: .95rem; border: 2px solid var(--line); border-radius: 14px; padding: 10px 14px; }
   @media (max-width: 560px) { .catrow { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -75,12 +83,15 @@
       <button class="tab" role="tab" data-tab="pendientes" aria-selected="true">Aportes por aprobar <span id="b-pend" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="solicitudes" aria-selected="false">Solicitudes de cambio <span id="b-sol" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="fichas" aria-selected="false">Todas las fichas</button>
+      <button class="tab" role="tab" data-tab="regiones" aria-selected="false">📍 Sin región <span id="b-reg" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="instagram" aria-selected="false">📸 Instagram</button>
     </div>
 
     <div id="tab-pendientes"></div>
 
     <div id="tab-instagram" hidden></div>
+
+    <div id="tab-regiones" hidden></div>
 
     <div id="tab-solicitudes" hidden>
       <div class="toolbar"><label class="chk"><input type="checkbox" id="ver-cerradas"> Mostrar también las resueltas/descartadas</label></div>
