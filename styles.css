@@ -266,3 +266,16 @@ dialog::backdrop { background: rgba(40, 14, 80, .55); backdrop-filter: blur(3px)
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- descripciones largas y extras ---------- */
+.card p.desc { white-space: pre-line; }
+.card p.desc.long:not(.open) {
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+}
+.more {
+  align-self: flex-start; border: 0; background: none; padding: 0; margin-top: -4px;
+  font: inherit; font-weight: 700; font-size: .88rem; color: var(--purple); cursor: pointer;
+}
+.reco { font-size: .85rem; color: var(--ink-soft); }
+.reco a { font-weight: 700; }
+.cbtn.ig2 { background: #F3EAFE; color: var(--purple-dark); }

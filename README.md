@@ -9,14 +9,20 @@ Directorio público de emprendimientos, servicios y trabajos de la comunidad de
 | Archivo | Para qué |
 |---|---|
 | `index.html`, `styles.css`, `app.js` | La app web (categorías, buscador, formulario para sumarse) |
-| `datos.js` | Categorías, subcategorías y los datos extraídos de los comentarios |
+| `datos.js` | Categorías y fichas (se genera con `herramientas/generar_datos.py`) |
+| `herramientas/comentarios_extraidos.json` | Transcripción de todos los comentarios de las capturas |
+| `herramientas/generar_datos.py` | Asigna categoría y nombre a cada @usuario y genera `datos.js` |
 | `netlify/functions/aportes.mjs` | API que guarda lo que agrega la gente (Netlify Blobs) |
 | `capturas/` | Pantallazos de los comentarios del post |
 
 ## Subir más capturas
 
-Sube los pantallazos nuevos a la carpeta `capturas/` (numerados: `06-comentarios.png`, `07-…`).
-Luego se extraen sus datos y se agregan a `datos.js`.
+Sube los pantallazos nuevos a la carpeta `capturas/`. Luego se transcriben a
+`herramientas/comentarios_extraidos.json`, se agrega cada @usuario a `PERSONAS` en
+`herramientas/generar_datos.py` y se corre `python3 herramientas/generar_datos.py`.
+
+El nombre de cada ficha es el que la persona dio en su comentario; si no dio uno, se muestra su @usuario.
+Los links de Instagram salen del @usuario tal como aparece en la captura.
 
 ## Publicar
 

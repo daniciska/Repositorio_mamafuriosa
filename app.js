@@ -136,7 +136,7 @@
     const cat = state.cat;
     if (cat && !p.cats.some((x) => x.c === cat && (!state.sub || x.s === state.sub))) return false;
     if (state.q) {
-      const hay = norm([p.nombre, p.instagram, p.descripcion, p.ubicacion, p.modalidad,
+      const hay = norm([p.nombre, p.instagram, ...(p.otrosInstagram || []), p.descripcion, p.ubicacion, p.modalidad,
         ...p.cats.map((x) => x.s), ...p.cats.map((x) => catById(x.c)?.nombre)].join(" "));
       return norm(state.q).split(/\s+/).every((w) => hay.includes(w));
     }
@@ -165,7 +165,9 @@
           ${showHandle ? `<div class="handle">@${esc(ig)}</div>` : ""}
         </div>
       </div>
-      <p class="desc">${esc(p.descripcion)}</p>
+      <p class="desc${(p.descripcion || "").length > 260 ? " long" : ""}">${esc(p.descripcion)}</p>
+      ${(p.descripcion || "").length > 260 ? `<button class="more" type="button" data-more>Ver más</button>` : ""}
+      ${p.recomendadaPor ? `<div class="reco">💬 Recomendada por <a href="https://www.instagram.com/${esc(cleanIg(p.recomendadaPor))}/" target="_blank" rel="noopener">@${esc(cleanIg(p.recomendadaPor))}</a></div>` : ""}
       <div class="tags">
         ${subs.map((s) => `<span class="tag">${esc(s)}</span>`).join("")}
         ${p.ubicacion ? `<span class="tag place">📍 ${esc(p.ubicacion)}</span>` : ""}
@@ -175,6 +177,7 @@
       <div class="contact">
         ${wa ? `<a class="cbtn wa" href="https://wa.me/${wa}?text=${msg}" target="_blank" rel="noopener">${ICON_WA} WhatsApp</a>` : ""}
         ${ig ? `<a class="cbtn ig" href="https://www.instagram.com/${esc(ig)}/" target="_blank" rel="noopener">${ICON_IG} Instagram</a>` : ""}
+        ${(p.otrosInstagram || []).map(cleanIg).filter(Boolean).map((h) => `<a class="cbtn ig2" href="https://www.instagram.com/${esc(h)}/" target="_blank" rel="noopener">${ICON_IG} @${esc(h)}</a>`).join("")}
         ${web ? `<a class="cbtn web" href="${esc(web)}" target="_blank" rel="noopener">${ICON_WEB} Web</a>` : ""}
       </div>
       ${p.local ? `<div class="local-note">Guardado solo en este dispositivo</div>` : ""}
@@ -209,6 +212,13 @@
     state.sub = "";
     renderAll();
     if (state.cat) document.querySelector(".results").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  els.list.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-more]");
+    if (!b) return;
+    const d = b.previousElementSibling;
+    const open = d.classList.toggle("open");
+    b.textContent = open ? "Ver menos" : "Ver más";
   });
   els.sub.addEventListener("change", () => { state.sub = els.sub.value; renderList(); });
   els.q.addEventListener("input", () => { state.q = els.q.value.trim(); renderSub(); renderList(); });
