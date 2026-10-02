@@ -153,14 +153,16 @@
     const subs = [...new Set(p.cats.map((x) => x.s || catById(x.c)?.nombre).filter(Boolean))];
     const ig = cleanIg(p.instagram);
     const wa = cleanPhone(p.whatsapp);
+    const titulo = (p.nombre || "").trim() || (ig ? "@" + ig : "Sin nombre");
+    const showHandle = ig && titulo !== "@" + ig;
     const web = safeUrl(p.web || "");
     const msg = encodeURIComponent("¡Hola! Te encontré en la Comunidad Mama Furiosa 💜");
     return `<article class="card" style="--c:${esc(color)}">
       <div class="card-top">
-        <div class="avatar" aria-hidden="true">${esc(initials(p.nombre || ""))}</div>
+        <div class="avatar" aria-hidden="true">${esc(initials(titulo.replace(/^@/, "")))}</div>
         <div>
-          <h3>${esc(p.nombre)}</h3>
-          ${ig ? `<div class="handle">@${esc(ig)}</div>` : ""}
+          <h3>${esc(titulo)}</h3>
+          ${showHandle ? `<div class="handle">@${esc(ig)}</div>` : ""}
         </div>
       </div>
       <p class="desc">${esc(p.descripcion)}</p>
