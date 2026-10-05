@@ -7,6 +7,7 @@
 //   eliminar                  {id}           borra un aporte (las fichas base solo se ocultan)
 //   resolver | descartar      {id}           solicitud de cambio
 //   cat-agregar {tipo: "sub", cat, nombre} | {tipo: "cat", nombre, emoji, desc}   cat-quitar {tipo, cat, nombre}
+//   cat-palabras {clave, palabras}   lote-editar {ops: [{id, ficha}]}  (agregar categorías a varias fichas)
 //   ig-iniciar | ig-medios | ig-elegir {mediaId, permalink, caption, desde} | ig-sincronizar | ig-desconectar
 import { store, json, readBody, limpiarFicha, listAll, esAdmin, tokenFicha, clean, leerCategorias, slug } from "../lib/comun.mjs";
 import * as instagram from "../lib/instagram.mjs";
@@ -67,6 +68,21 @@ export default async (req) => {
       default: return json({ error: "Acción desconocida" }, 400);
     }
   }
+  if (b?.accion === "cat-palabras") {
+    const lista = await leerCategorias();
+    const clave = clean(b.clave, 120);
+    const palabras = (Array.isArray(b.palabras) ? b.palabras : []).map((w) => clean(w, 40).toLowerCase()).filter((w) => w.length >= 3).slice(0, 15);
+    if (!clave) return json({ error: "Falta la categoría" }, 400);
+    if (palabras.length) lista.palabras[clave] = palabras; else delete lista.palabras[clave];
+    await store("categorias").setJSON("lista", lista);
+    return json({ ok: true, categorias: lista });
+  }
+  if (b?.accion === "lote-editar") {
+    const ops = Array.isArray(b.ops) ? b.ops.slice(0, 60) : [];
+    let hechos = 0;
+    for (const op of ops) if (await editarFicha(String(op?.id || "").slice(0, 120), op?.ficha)) hechos++;
+    return json({ hechos });
+  }
   if (b?.accion === "cat-agregar" || b?.accion === "cat-quitar") {
     const lista = await leerCategorias();
     const nombre = clean(b.nombre, 40);
@@ -77,7 +93,10 @@ export default async (req) => {
       if (b.accion === "cat-agregar") {
         if (lista.nuevas.some((c) => c.id === id || igual(c.nombre, nombre))) return json({ error: "Esa categoría ya existe" }, 400);
         lista.nuevas.push({ id, nombre, emoji: clean(b.emoji, 16) || "✨", desc: clean(b.desc, 80), subs: [] });
-      } else lista.nuevas = lista.nuevas.filter((c) => c.id !== id);
+      } else {
+        lista.nuevas = lista.nuevas.filter((c) => c.id !== id);
+        for (const k of Object.keys(lista.palabras)) if (k === id || k.startsWith(id + "|")) delete lista.palabras[k];
+      }
     } else {
       const cat = clean(b.cat, 60);
       if (!cat) return json({ error: "Falta la categoría" }, 400);
@@ -86,6 +105,7 @@ export default async (req) => {
       const resto = subs.filter((s) => !igual(s, nombre));
       if (b.accion === "cat-agregar") resto.push(nombre);
       if (nueva) nueva.subs = resto; else if (resto.length) lista.subs[cat] = resto; else delete lista.subs[cat];
+      if (b.accion === "cat-quitar") for (const k of Object.keys(lista.palabras)) if (k.startsWith(cat + "|") && igual(k.slice(cat.length + 1), nombre)) delete lista.palabras[k];
     }
     await store("categorias").setJSON("lista", lista);
     return json({ ok: true, categorias: lista });
@@ -147,18 +167,8 @@ export default async (req) => {
       await aportes.setJSON(id, { ...final, estado: b.accion === "aprobar" ? "aprobado" : "rechazado", revisado: ahora });
       return json({ ok: true });
     }
-    case "editar": {
-      const f = limpiarFicha(b.ficha || {});
-      if (esBase) {
-        const prev = (await ediciones.get(id, { type: "json" })) || {};
-        await ediciones.setJSON(id, { ...prev, ...f, id, editado: ahora });
-      } else {
-        const a = await aportes.get(id, { type: "json" });
-        if (!a) return json({ error: "No existe" }, 404);
-        await aportes.setJSON(id, { ...a, ...f, editado: ahora });
-      }
-      return json({ ok: true });
-    }
+    case "editar":
+      return (await editarFicha(id, b.ficha)) ? json({ ok: true }) : json({ error: "No existe" }, 404);
     case "ocultar":
     case "mostrar": {
       const oculta = b.accion === "ocultar";
@@ -188,5 +198,23 @@ export default async (req) => {
       return json({ error: "Acción desconocida" }, 400);
   }
 };
+
+// Guarda los cambios a una ficha base (como edición) o a un aporte. Devuelve false si el aporte no existe.
+async function editarFicha(id, ficha) {
+  if (!id) return false;
+  const f = limpiarFicha(ficha || {});
+  const ahora = new Date().toISOString();
+  if (id.startsWith("base:")) {
+    const ediciones = store("ediciones");
+    const prev = (await ediciones.get(id, { type: "json" })) || {};
+    await ediciones.setJSON(id, { ...prev, ...f, id, editado: ahora });
+    return true;
+  }
+  const aportes = store("aportes");
+  const a = await aportes.get(id, { type: "json" });
+  if (!a) return false;
+  await aportes.setJSON(id, { ...a, ...f, editado: ahora });
+  return true;
+}
 
 export const config = { path: "/api/admin" };

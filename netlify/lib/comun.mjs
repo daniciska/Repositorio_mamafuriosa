@@ -37,10 +37,12 @@ export async function readBody(req) {
 }
 
 // Ficha pública: solo campos visibles, sin datos internos.
-// Categorías y subcategorías agregadas por el admin: {nuevas: [{id, nombre, emoji, desc, subs}], subs: {catId: [nombre]}}
+// Categorías y subcategorías agregadas por el admin: {nuevas: [{id, nombre, emoji, desc, subs}], subs: {catId: [nombre]},
+// palabras: {"catId" | "catId|Subcategoría": [palabras para encontrar fichas que calzan]}}
 export async function leerCategorias() {
   const c = await store("categorias").get("lista", { type: "json" });
-  return { nuevas: Array.isArray(c?.nuevas) ? c.nuevas : [], subs: c?.subs && typeof c.subs === "object" ? c.subs : {} };
+  const obj = (x) => (x && typeof x === "object" && !Array.isArray(x) ? x : {});
+  return { nuevas: Array.isArray(c?.nuevas) ? c.nuevas : [], subs: obj(c?.subs), palabras: obj(c?.palabras) };
 }
 export const slug = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
 

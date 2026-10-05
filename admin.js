@@ -85,6 +85,8 @@
   function rearmar() {
     const aprobados = datos.aportes.filter((a) => a.estado === "aprobado");
     modelo = window.MF.construir({ aportes: aprobados, ediciones: datos.ediciones, categorias: datos.categorias, incluirOcultas: true });
+    // Las categorías agregadas desde el panel también se sugieren al aprobar comentarios.
+    window.MF_SUGERENCIAS.agregarReglas(reglasAdmin().map((r) => [r.c, r.s, r.palabras]));
   }
 
   // ---------- tabs ----------
@@ -754,6 +756,59 @@
 
   // ---------- categorías ----------
   let catTexto = "";
+  let revisionAbierta = false;
+  const VACIAS = new Set(["para", "como", "otro", "otra", "otros", "otras", "todo", "todos", "toda", "todas", "servicio", "servicios", "venta", "ventas", "tienda", "tiendas", "general", "cosas", "clase", "clases", "hecho", "hechos"]);
+  // Palabras por defecto para encontrar fichas de una categoría: las de su nombre, sin plural.
+  const palabrasDe = (nombre) => [...new Set(norm(nombre).split(/[^a-z0-9ñ]+/)
+    .filter((w) => w.length >= 4 && !VACIAS.has(w)).map((w) => (w.length >= 5 && w.endsWith("s") ? w.slice(0, -1) : w)))];
+
+  // Una regla por cada categoría o subcategoría agregada desde el panel: {clave, c, s, titulo, palabras}
+  function reglasAdmin() {
+    const cfg = datos.categorias || { nuevas: [], subs: {}, palabras: {} };
+    const pal = cfg.palabras || {};
+    const out = [];
+    const agregar = (clave, c, s, nombre, titulo) => out.push({ clave, c, s, titulo, palabras: pal[clave] || palabrasDe(nombre), propias: Boolean(pal[clave]) });
+    for (const c of cfg.nuevas || []) {
+      agregar(c.id, c.id, "", c.nombre + " " + (c.desc || ""), `${c.emoji} ${c.nombre}`);
+      for (const s of c.subs || []) agregar(c.id + "|" + s, c.id, s, s, `${c.emoji} ${c.nombre} › ${s}`);
+    }
+    for (const [id, subs] of Object.entries(cfg.subs || {})) {
+      const cat = window.CATEGORIAS.find((x) => x.id === id) || { emoji: "", nombre: id };
+      for (const s of subs) agregar(id + "|" + s, id, s, s, `${cat.emoji} ${cat.nombre} › ${s}`);
+    }
+    return out;
+  }
+
+  function renderRevision() {
+    const reglas = reglasAdmin();
+    if (!reglas.length) return `<p class="meta">Primero agrega una categoría o subcategoría arriba.</p>`;
+    let total = 0;
+    const grupos = reglas.map((r) => {
+      const yaTiene = (p) => (p.cats || []).some((x) => x.c === r.c && (!r.s || norm(x.s) === norm(r.s)));
+      const cand = modelo.personas.filter((p) => !p.oculta && !yaTiene(p) && window.MF_SUGERENCIAS.coincide(p.descripcion + " " + (p.nombre || ""), r.palabras));
+      total += cand.length;
+      return `<article class="item">
+        <h3>${esc(r.titulo)} <span class="pill ${cand.length ? "ok" : ""}">${cand.length} posibles</span></h3>
+        <div class="row" style="flex-wrap:wrap">
+          <label class="sub-select" style="flex:1 1 220px"><span>Palabras que busco (separadas por coma)</span>
+            <input data-palabras="${esc(r.clave)}" value="${esc(r.palabras.join(", "))}" style="font:inherit;border:2px solid var(--line);border-radius:12px;padding:8px 10px"></label>
+          <button class="btn btn-ghost small-btn" data-guardar-palabras="${esc(r.clave)}" style="align-self:flex-end">Guardar y buscar</button>
+        </div>
+        ${cand.length ? cand.map((p) => `<label class="fila" style="cursor:pointer;justify-content:flex-start">
+          <input type="checkbox" checked data-cand="${esc(r.clave)}" data-id="${esc(p.id)}" style="width:22px;height:22px;flex:0 0 22px;accent-color:var(--purple)">
+          <span class="quien"><b>${esc(titulo(p))}</b> ${catsTexto(p, modelo.categorias)}<small>${esc(String(p.descripcion || "").slice(0, 160))}${String(p.descripcion || "").length > 160 ? "…" : ""}</small></span>
+        </label>`).join("") : `<p class="meta">No encontré fichas con esas palabras que no la tengan ya. Prueba con otras.</p>`}
+      </article>`;
+    }).join("");
+    return grupos + (total ? `<div class="actions"><button class="btn btn-ok" data-aplicar-revision>✓ Agregar la categoría a las marcadas</button></div>` : "");
+  }
+
+  // La ficha tal como está, con otras categorías (el servidor guarda todos los campos que recibe).
+  const fichaActual = (p, cats) => ({
+    nombre: p.nombre || "", instagram: p.instagram || "", descripcion: p.descripcion || "", whatsapp: p.whatsapp || "",
+    web: p.web || "", ubicacion: p.ubicacion || "", modalidad: p.modalidad || "", region: p.region || "",
+    todoChile: Boolean(p.todoChile), otrosInstagram: p.otrosInstagram || [], cats
+  });
   const palabras = (t) => norm(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 4).map((w) => w.slice(0, 5));
 
   function opcionesCategoria(texto) {
@@ -804,6 +859,12 @@
     }
     $("#tab-categorias").innerHTML = `
       <article class="item">
+        <h3>🔄 Actualizar categorizaciones</h3>
+        <p class="meta">Busca en las fichas publicadas cuáles podrían ir también en las categorías y subcategorías que agregaste aquí. Tú marcas a cuáles se suma. Los comentarios por aprobar ya las reciben como sugerencia.</p>
+        <div class="actions"><button class="btn btn-add small-btn" data-cat-actualizar>${revisionAbierta ? "Cerrar revisión" : "🔄 Actualizar categorizaciones"}</button></div>
+      </article>
+      ${revisionAbierta ? `<div id="cat-revision">${renderRevision()}</div>` : ""}
+      <article class="item">
         <h3>Agregar categoría o subcategoría</h3>
         <p class="meta">Escribe lo que quieres agregar (ej. «Uñas», «Clases de inglés», «Mascotas») y te muestro si calza como subcategoría de alguna existente o si conviene crear una nueva.</p>
         <div class="toolbar" style="margin:0">
@@ -839,6 +900,40 @@
   $("#tab-categorias").addEventListener("click", async (e) => {
     const t = e.target.closest("button");
     if (!t) return;
+    if (t.hasAttribute("data-cat-actualizar")) { revisionAbierta = !revisionAbierta; renderCategorias(); return; }
+    if (t.dataset.guardarPalabras) {
+      const clave = t.dataset.guardarPalabras;
+      const input = [...document.querySelectorAll("[data-palabras]")].find((x) => x.dataset.palabras === clave);
+      const palabras = input.value.split(",").map((w) => w.trim()).filter(Boolean);
+      await guardarCategoria({ accion: "cat-palabras", clave, palabras }, "Palabras guardadas");
+      return;
+    }
+    if (t.hasAttribute("data-aplicar-revision")) {
+      const reglas = Object.fromEntries(reglasAdmin().map((r) => [r.clave, r]));
+      const porFicha = new Map();
+      document.querySelectorAll("[data-cand]:checked").forEach((x) => {
+        const r = reglas[x.dataset.cand];
+        if (r) (porFicha.get(x.dataset.id) || porFicha.set(x.dataset.id, []).get(x.dataset.id)).push({ c: r.c, s: r.s });
+      });
+      if (!porFicha.size) { toast("No hay fichas marcadas"); return; }
+      if (!confirm(`¿Agregar las categorías a ${porFicha.size} ficha${porFicha.size === 1 ? "" : "s"}?`)) return;
+      const ops = [...porFicha].map(([id, nuevas]) => {
+        const p = modelo.personas.find((x) => x.id === id);
+        const cats = [...(p.cats || [])];
+        for (const n of nuevas) if (!cats.some((x) => x.c === n.c && norm(x.s) === norm(n.s))) cats.push(n);
+        return { id, ficha: fichaActual(p, cats.slice(0, 8)) };
+      });
+      try {
+        let hechos = 0;
+        for (let i = 0; i < ops.length; i += 50) {
+          toast(`Guardando… ${Math.min(i + 50, ops.length)} de ${ops.length}`);
+          hechos += (await api("POST", { accion: "lote-editar", ops: ops.slice(i, i + 50) })).hechos || 0;
+        }
+        toast(`${hechos} fichas actualizadas`);
+        await cargar();
+      } catch (err) { toast(err.message); }
+      return;
+    }
     if (t.hasAttribute("data-cat-ver")) {
       catTexto = $("#cat-texto").value.trim();
       $("#cat-opciones").innerHTML = opcionesCategoria(catTexto);

@@ -119,13 +119,24 @@
   ];
 
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const RX = REGLAS.map(([c, s, palabras]) => ({ c, s, rx: new RegExp("(^|[^a-z0-9])(" + palabras.map(esc).join("|") + ")", "g") }));
+  const regla = ([c, s, palabras]) => ({ c, s, rx: new RegExp("(^|[^a-z0-9])(" + palabras.map((w) => esc(norm(w))).join("|") + ")", "g") });
+  const RX = REGLAS.map(regla);
+  // Reglas de las categorías/subcategorías que el admin agregó desde el panel (van antes que las fijas).
+  let EXTRA = [];
+  function agregarReglas(reglas) {
+    EXTRA = reglas.filter((r) => r[0] && r[2] && r[2].length).map(regla);
+  }
+  // ¿El texto calza con estas palabras? (inicio de palabra, sin tildes)
+  function coincide(texto, palabras) {
+    if (!palabras || !palabras.length) return false;
+    return regla(["", "", palabras]).rx.test(norm(texto));
+  }
 
   // Devuelve hasta 2 categorías distintas [{c, s}] ordenadas por cantidad de coincidencias.
   function sugerir(texto) {
     const t = norm(texto);
     const puntajes = [];
-    RX.forEach((r, i) => {
+    EXTRA.concat(RX).forEach((r, i) => {
       const n = (t.match(r.rx) || []).length;
       if (n) puntajes.push({ c: r.c, s: r.s, n, i });
     });
@@ -141,5 +152,5 @@
     return out;
   }
 
-  window.MF_SUGERENCIAS = { sugerir };
+  window.MF_SUGERENCIAS = { sugerir, agregarReglas, coincide };
 })();
