@@ -227,7 +227,44 @@
     renderInstagram();
     renderRegiones();
     renderCategorias();
+    renderBusqueda();
   }
+
+  // ---------- buscador general (fichas publicadas, por aprobar y rechazadas) ----------
+  function renderBusqueda() {
+    const texto = $("#buscar-todo").value.trim();
+    const q = norm(texto), digitos = texto.replace(/\D/g, "");
+    $("#busqueda").hidden = !q; $("#pestanas").hidden = Boolean(q);
+    if (!q) return;
+    const calza = (p) => norm([p.nombre, p.instagram, p.descripcion, p.ubicacion, p.web, ...(p.otrosInstagram || [])].join(" ")).includes(q.replace(/^@/, ""))
+      || (digitos.length >= 5 && String(p.whatsapp || "").includes(digitos));
+    const publicadas = modelo.personas.filter(calza).sort((a, b) => titulo(a).localeCompare(titulo(b), "es"));
+    const pendientes = datos.aportes.filter((a) => a.estado === "pendiente" && calza(a));
+    const rechazadas = datos.aportes.filter((a) => a.estado === "rechazado" && calza(a));
+    const tarjeta = (p, etiqueta, botones) => `<article class="item">
+        <h3>${esc(titulo(p))} ${etiqueta}${p.oculta ? ' <span class="pill warn">oculta</span>' : ""}</h3>
+        <div class="meta">${contacto(p)}</div>
+        <div>${catsTexto(p, modelo.categorias)}</div>
+        <p>${esc(p.descripcion)}</p>
+        <div class="actions">${botones}</div>
+      </article>`;
+    const total = publicadas.length + pendientes.length + rechazadas.length;
+    $("#busqueda").innerHTML = `<p class="meta">${total ? `${total} resultado${total === 1 ? "" : "s"} para «${esc(texto)}»` : `Nada encontrado para «${esc(texto)}»`} · <a href="#" data-limpiar-busqueda>volver al panel</a></p>`
+      + publicadas.slice(0, 50).map((p) => tarjeta(p, '<span class="pill ok">publicada</span>', `
+          <button class="btn btn-ghost" data-edit="${esc(p.id)}">✎ Editar</button>
+          <button class="btn btn-ghost" data-act="${p.oculta ? "mostrar" : "ocultar"}" data-id="${esc(p.id)}">${p.oculta ? "👁 Mostrar" : "🙈 Ocultar"}</button>`)).join("")
+      + pendientes.map((a) => tarjeta(a, '<span class="pill">por aprobar</span>', `
+          <button class="btn btn-ghost" data-edit-pend="${esc(a.id)}">✎ Editar y aprobar</button>
+          <button class="btn btn-no" data-act="rechazar" data-id="${esc(a.id)}">✕ Rechazar</button>`)).join("")
+      + rechazadas.map((a) => tarjeta(a, '<span class="pill warn">rechazada</span>', `
+          <button class="btn btn-ok" data-recuperar="${esc(a.id)}">↩ Volver a pendientes</button>`)).join("")
+      + (publicadas.length > 50 ? `<p class="empty-msg">Mostrando 50 de ${publicadas.length} publicadas. Escribe algo más específico.</p>` : "");
+  }
+  $("#buscar-todo").addEventListener("input", renderBusqueda);
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-limpiar-busqueda]")) return;
+    e.preventDefault(); $("#buscar-todo").value = ""; renderBusqueda();
+  });
 
   function renderFichas() {
     const q = norm($("#fq").value.trim());

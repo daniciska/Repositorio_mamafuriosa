@@ -79,6 +79,11 @@
   </form>
 
   <section id="panel" hidden>
+    <div class="toolbar">
+      <input id="buscar-todo" type="search" placeholder="🔎 Buscar en todo: nombre, @usuario, teléfono o texto…" autocomplete="off">
+    </div>
+    <div id="busqueda" hidden></div>
+    <div id="pestanas">
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-tab="pendientes" aria-selected="true">Aportes por aprobar <span id="b-pend" class="badge"></span></button>
       <button class="tab" role="tab" data-tab="solicitudes" aria-selected="false">Solicitudes de cambio <span id="b-sol" class="badge"></span></button>
@@ -108,6 +113,7 @@
       </div>
       <p id="fcount" class="meta"></p>
       <div id="fichas-list"></div>
+    </div>
     </div>
   </section>
 </div>
