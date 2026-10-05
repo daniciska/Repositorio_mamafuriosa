@@ -342,7 +342,11 @@
     if (ep) {
       const a = datos.aportes.find((x) => x.id === ep.dataset.editPend);
       const m = window.MF.construir({ aportes: [a] });
-      abrirEditor(m.personas.find((p) => p.id === a.id), "aprobar", modelo.categorias.concat(m.categorias.filter((c) => !modelo.categorias.some((y) => y.id === c.id))));
+      let p = m.personas.find((x) => x.id === a.id);
+      // Sin categoría: se precargan las sugeridas para que solo haya que quitar o ajustar.
+      const sug = p && !p.cats.length ? window.MF_SUGERENCIAS.sugerir(a.descripcion) : [];
+      if (sug.length) p = { ...p, cats: sug };
+      abrirEditor(p, "aprobar", modelo.categorias.concat(m.categorias.filter((c) => !modelo.categorias.some((y) => y.id === c.id))), sug.length > 0);
     }
     if (e.target.closest("[data-close-edit]")) $("#edit-dialog").close();
   });
@@ -668,8 +672,9 @@
   }
   $("#add-cat").addEventListener("click", () => catRow());
 
-  function abrirEditor(p, accion, cats) {
+  function abrirEditor(p, accion, cats, conSugerencia = false) {
     if (!p) return;
+    $("#edit-hint").hidden = !conSugerencia;
     editando = p; accionEditor = accion; catsEditor = cats;
     $("#edit-title").textContent = accion === "aprobar" ? "Revisar y aprobar" : "Editar ficha";
     $("#edit-save").textContent = accion === "aprobar" ? "Guardar y aprobar" : "Guardar";
