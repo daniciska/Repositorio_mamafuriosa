@@ -12,7 +12,7 @@
 // Variables de entorno: IG_APP_ID, IG_APP_SECRET (secreta). URL la define Netlify.
 // IG_GRAPH / IG_OAUTH / IG_AUTHORIZE solo sirven para pruebas locales contra un servidor simulado.
 import { randomBytes } from "node:crypto";
-import { store, newId, clean, cleanIg } from "./comun.mjs";
+import { store, newId, clean, cleanIg, listAll } from "./comun.mjs";
 
 const GRAPH = () => process.env.IG_GRAPH || "https://graph.instagram.com";
 const OAUTH = () => process.env.IG_OAUTH || "https://api.instagram.com";
@@ -138,6 +138,21 @@ export async function medios() {
   }));
 }
 
+// Deja como "vistos" solo los comentarios que ya se importaron como aportes, para que los descartados
+// (por fecha, cortos, etc.) se vuelvan a evaluar al cambiar el post o la fecha, sin duplicar los importados.
+async function reiniciarVistos(mediaId) {
+  const importados = (await listAll(store("aportes"))).filter((a) => a.origen === "instagram" && a.comentarioId).map((a) => a.comentarioId);
+  await ig().setJSON("vistos-" + mediaId, importados);
+}
+
+export async function cambiarFecha(desde) {
+  const c = await conexionValida();
+  if (!c?.mediaId) throw new Error("Primero elige el post");
+  c.desde = /^\d{4}-\d{2}-\d{2}$/.test(desde || "") ? desde : "";
+  await ig().setJSON("conexion", c);
+  await reiniciarVistos(c.mediaId);
+}
+
 export async function elegir({ mediaId, permalink, caption, desde }) {
   const c = await conexionValida();
   if (!c) throw new Error("Instagram no está conectado");
@@ -147,6 +162,7 @@ export async function elegir({ mediaId, permalink, caption, desde }) {
   c.caption = clean(caption, 160);
   c.desde = /^\d{4}-\d{2}-\d{2}$/.test(desde || "") ? desde : "";
   await ig().setJSON("conexion", c);
+  await reiniciarVistos(c.mediaId);
 }
 
 // ---------- sincronizar ----------
@@ -177,35 +193,52 @@ export async function sincronizar() {
   if (!c) return { omitido: "Instagram no está conectado" };
   if (!c.mediaId) return { omitido: "Falta elegir el post" };
 
+  const guardar = async (resultado) => {
+    const actual = (await ig().get("conexion", { type: "json" })) || c;
+    await ig().setJSON("conexion", { ...actual, ultimaSync: resultado.fecha, ultimoResultado: resultado });
+    return resultado;
+  };
+
+  let comentarios, totalPost = null;
+  try {
+    comentarios = await todosLosComentarios(c);
+    // Cuántos comentarios dice tener el post (para detectar si Instagram entrega menos de los que hay).
+    const m = await pedir(`${GRAPH()}/${c.mediaId}?` + new URLSearchParams({ fields: "comments_count", access_token: c.token })).catch(() => null);
+    totalPost = m?.comments_count ?? null;
+  } catch (e) {
+    return guardar({ error: e.message, fecha: new Date().toISOString() });
+  }
+
   const vistosStore = ig();
   const vistos = new Set((await vistosStore.get("vistos-" + c.mediaId, { type: "json" })) || []);
   const desde = c.desde ? Date.parse(c.desde + "T00:00:00Z") : 0;
-  const comentarios = await todosLosComentarios(c);
   const aportes = store("aportes");
-  let nuevos = 0, ignorados = 0;
+  const r = { nuevos: 0, yaVistos: 0, anteriores: 0, cortos: 0, propios: 0, sinUsuario: 0 };
 
   for (const k of comentarios) {
-    if (!k.id || vistos.has(k.id)) continue;
-    vistos.add(k.id);
+    if (!k.id) continue;
+    if (vistos.has(k.id)) { r.yaVistos++; continue; }
     const usuario = cleanIg(k.username);
     const texto = clean(k.text, 1500);
     const fecha = Date.parse(k.timestamp || "") || Date.now();
-    if (!usuario || usuario.toLowerCase() === String(c.usuario).toLowerCase() || fecha < desde || !util(texto)) {
-      ignorados++;
-      continue;
-    }
+    // Anteriores a la fecha elegida: no se marcan como vistos, así se reevalúan si se cambia la fecha.
+    if (fecha < desde) { r.anteriores++; continue; }
+    vistos.add(k.id);
+    if (!usuario) { r.sinUsuario++; continue; }
+    if (usuario.toLowerCase() === String(c.usuario).toLowerCase()) { r.propios++; continue; }
+    if (!util(texto)) { r.cortos++; continue; }
     const id = newId();
     await aportes.setJSON(id, {
       id, estado: "pendiente", origen: "instagram", fecha: new Date().toISOString(),
       comentarioId: k.id, comentarioFecha: k.timestamp || "", ...(k.respuestaA ? { respuestaA: k.respuestaA } : {}),
       nombre: "", instagram: usuario, descripcion: texto, whatsapp: "", web: "", ubicacion: "", modalidad: "", cats: [],
     });
-    nuevos++;
+    r.nuevos++;
   }
 
   await vistosStore.setJSON("vistos-" + c.mediaId, [...vistos]);
-  const resultado = { nuevos, ignorados, revisados: comentarios.length, fecha: new Date().toISOString() };
-  const actual = (await ig().get("conexion", { type: "json" })) || c;
-  await ig().setJSON("conexion", { ...actual, ultimaSync: resultado.fecha, ultimoResultado: resultado });
-  return resultado;
+  return guardar({
+    ...r, ignorados: r.anteriores + r.cortos + r.propios + r.sinUsuario,
+    revisados: comentarios.length, totalPost, fecha: new Date().toISOString(),
+  });
 }

@@ -246,9 +246,19 @@
         <h3>Conectado como @${esc(ig.usuario)} <span class="pill ok">activo</span></h3>
         <div class="meta">El permiso dura ${esc(ig.venceEnDias)} días más y se renueva solo con cada sincronización.</div>
         ${ig.post ? `<p><b>Post:</b> <a href="${esc(ig.post.permalink)}" target="_blank" rel="noopener">${esc(ig.post.caption || ig.post.permalink)}</a></p>
-          <div class="meta">${ig.desde ? "Se importan los comentarios desde el " + esc(ig.desde) : "Se importan todos los comentarios"} ·
-          Se revisa sola cada 6 horas.</div>
-          <div class="meta">${ig.ultimaSync ? `Última revisión: ${esc(fecha(ig.ultimaSync))}${r ? ` · ${r.nuevos} nuevos, ${r.ignorados} ignorados (saludos, emojis, ya vistos o de la cuenta dueña)` : ""}` : "Todavía no se ha revisado."}</div>` :
+          <div class="toolbar" style="margin:6px 0 0">
+            <label class="field" style="max-width:240px"><span>Importar comentarios desde (vacío = todos)</span>
+              <input type="date" id="ig-desde-actual" value="${esc(ig.desde || "")}"></label>
+            <button class="btn btn-ghost small-btn" data-ig="ig-fecha" style="align-self:flex-end">Guardar fecha y revisar</button>
+          </div>
+          <div class="meta">Se revisa sola cada 6 horas. Al cambiar la fecha se vuelven a evaluar los comentarios descartados; los ya importados no se repiten.</div>
+          <div class="meta">${ig.ultimaSync ? `Última revisión: ${esc(fecha(ig.ultimaSync))}` : "Todavía no se ha revisado."}</div>
+          ${r && r.error ? `<p class="form-msg err">⚠ La última revisión falló: ${esc(r.error)}</p>` : ""}
+          ${r && !r.error ? `<ul class="meta" style="margin:4px 0 0;padding-left:18px">
+            <li>Instagram entregó <b>${esc(r.revisados)}</b>${r.totalPost != null ? ` de los <b>${esc(r.totalPost)}</b>` : ""} comentarios del post${r.totalPost && r.revisados < r.totalPost / 2 ? " ⚠ (menos de los que tiene: puede ser una restricción de Instagram)" : ""}</li>
+            <li><b>${esc(r.nuevos)}</b> nuevos → quedaron en "Aportes por aprobar"</li>
+            ${r.yaVistos != null ? `<li>${esc(r.yaVistos)} ya revisados antes · ${esc(r.anteriores)} anteriores a la fecha elegida · ${esc(r.cortos)} muy cortos (emojis, saludos) · ${esc(r.propios)} de la cuenta dueña${r.sinUsuario ? ` · ${esc(r.sinUsuario)} sin usuario` : ""}</li>` : ""}
+          </ul>` : ""}` :
           `<p class="form-msg err">Falta elegir de qué post traer los comentarios.</p>`}
         <div class="actions">
           ${ig.post ? `<button class="btn btn-ok" data-ig="ig-sincronizar">↻ Revisar comentarios ahora</button>` : ""}
@@ -290,7 +300,7 @@
         medios = null;
         toast("Post elegido. Revisando comentarios…");
         const r = await api("POST", { accion: "ig-sincronizar" });
-        toast(`${r.nuevos || 0} comentarios nuevos para revisar`);
+        toast(r.error ? "Error: " + r.error : `${r.nuevos || 0} comentarios nuevos para revisar`);
         await cargar();
       } else if (b.dataset.ig === "ig-iniciar") {
         const r = await api("POST", { accion: "ig-iniciar" });
@@ -304,9 +314,13 @@
       } else if (b.dataset.ig === "ig-medios") {
         medios = (await api("POST", { accion: "ig-medios" })).medios;
         renderInstagram();
+      } else if (b.dataset.ig === "ig-fecha") {
+        const r = await api("POST", { accion: "ig-fecha", desde: $("#ig-desde-actual").value });
+        toast(r.error ? "Error: " + r.error : `Fecha guardada · ${r.nuevos || 0} comentarios nuevos para revisar`);
+        await cargar();
       } else if (b.dataset.ig === "ig-sincronizar") {
         const r = await api("POST", { accion: "ig-sincronizar" });
-        toast(r.omitido || `${r.nuevos} comentarios nuevos para revisar en "Aportes por aprobar"`);
+        toast(r.omitido || r.error || `${r.nuevos} comentarios nuevos para revisar en "Aportes por aprobar"`);
         await cargar();
       } else if (b.dataset.ig === "ig-desconectar") {
         if (!confirm("¿Desconectar Instagram? Dejarán de llegar comentarios nuevos.")) { btn.disabled = false; return; }

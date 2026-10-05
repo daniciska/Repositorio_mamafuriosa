@@ -73,6 +73,7 @@ export default async (req) => {
         case "ig-medios": return json({ medios: await instagram.medios() });
         case "ig-elegir": await instagram.elegir(b); return json({ ok: true });
         case "ig-sincronizar": return json(await instagram.sincronizar());
+        case "ig-fecha": await instagram.cambiarFecha(b.desde); return json(await instagram.sincronizar());
         case "ig-desconectar": await instagram.desconectar(); return json({ ok: true });
         default: return json({ error: "Acción desconocida" }, 400);
       }
