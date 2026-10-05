@@ -163,6 +163,7 @@
         <p class="meta" style="margin:0">Los rechazados no se publican ni se borran. Si recuperas uno, vuelve a "Aportes por aprobar" para revisarlo de nuevo.</p>` : `
         <div class="actions">
           <button class="btn btn-ok small-btn" data-bulk="sugerida">✓ Aprobar seleccionados con su sugerencia</button>
+          <button class="btn btn-ghost small-btn" data-ir-actualizar>🔄 Actualizar categorizaciones</button>
           <button class="btn btn-no small-btn" data-bulk="rechazar">✕ Rechazar seleccionados</button>
         </div>
         <div class="toolbar" style="margin:0">
@@ -895,6 +896,14 @@
     } catch (err) { toast(err.message); }
   }
 
+  // Desde "Aportes por aprobar": abre la revisión en la pestaña Categorías.
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("[data-ir-actualizar]")) return;
+    revisionAbierta = true;
+    document.querySelector('[data-tab="categorias"]').click();
+    renderCategorias();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   $("#tab-categorias").addEventListener("keydown", (e) => {
     if (e.target.id === "cat-texto" && e.key === "Enter") { e.preventDefault(); $("[data-cat-ver]").click(); }
   });
