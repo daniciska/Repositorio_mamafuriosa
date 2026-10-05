@@ -785,7 +785,8 @@
     let total = 0;
     const grupos = reglas.map((r) => {
       const yaTiene = (p) => (p.cats || []).some((x) => x.c === r.c && (!r.s || norm(x.s) === norm(r.s)));
-      const cand = modelo.personas.filter((p) => !p.oculta && !yaTiene(p) && window.MF_SUGERENCIAS.coincide(p.descripcion + " " + (p.nombre || ""), r.palabras));
+      // Solo comentarios por aprobar: las fichas ya publicadas no se tocan.
+      const cand = datos.aportes.filter((p) => p.estado === "pendiente" && !yaTiene(p) && window.MF_SUGERENCIAS.coincide(p.descripcion + " " + (p.nombre || ""), r.palabras));
       total += cand.length;
       return `<article class="item">
         <h3>${esc(r.titulo)} <span class="pill ${cand.length ? "ok" : ""}">${cand.length} posibles</span></h3>
@@ -797,10 +798,10 @@
         ${cand.length ? cand.map((p) => `<label class="fila" style="cursor:pointer;justify-content:flex-start">
           <input type="checkbox" checked data-cand="${esc(r.clave)}" data-id="${esc(p.id)}" style="width:22px;height:22px;flex:0 0 22px;accent-color:var(--purple)">
           <span class="quien"><b>${esc(titulo(p))}</b> ${catsTexto(p, modelo.categorias)}<small>${esc(String(p.descripcion || "").slice(0, 160))}${String(p.descripcion || "").length > 160 ? "…" : ""}</small></span>
-        </label>`).join("") : `<p class="meta">No encontré fichas con esas palabras que no la tengan ya. Prueba con otras.</p>`}
+        </label>`).join("") : `<p class="meta">No encontré comentarios por aprobar con esas palabras. Prueba con otras.</p>`}
       </article>`;
     }).join("");
-    return grupos + (total ? `<div class="actions"><button class="btn btn-ok" data-aplicar-revision>✓ Agregar la categoría a las marcadas</button></div>` : "");
+    return grupos + (total ? `<div class="actions"><button class="btn btn-ok" data-aplicar-revision>✓ Asignar la categoría a los marcados</button></div>` : "");
   }
 
   // La ficha tal como está, con otras categorías (el servidor guarda todos los campos que recibe).
@@ -860,7 +861,7 @@
     $("#tab-categorias").innerHTML = `
       <article class="item">
         <h3>🔄 Actualizar categorizaciones</h3>
-        <p class="meta">Busca en las fichas publicadas cuáles podrían ir también en las categorías y subcategorías que agregaste aquí. Tú marcas a cuáles se suma. Los comentarios por aprobar ya las reciben como sugerencia.</p>
+        <p class="meta">Busca en los comentarios por aprobar cuáles podrían ir en las categorías y subcategorías que agregaste aquí. Tú marcas a cuáles se asigna; siguen por aprobar, ya con esa categoría. Las fichas publicadas no se tocan.</p>
         <div class="actions"><button class="btn btn-add small-btn" data-cat-actualizar>${revisionAbierta ? "Cerrar revisión" : "🔄 Actualizar categorizaciones"}</button></div>
       </article>
       ${revisionAbierta ? `<div id="cat-revision">${renderRevision()}</div>` : ""}
@@ -916,9 +917,9 @@
         if (r) (porFicha.get(x.dataset.id) || porFicha.set(x.dataset.id, []).get(x.dataset.id)).push({ c: r.c, s: r.s });
       });
       if (!porFicha.size) { toast("No hay fichas marcadas"); return; }
-      if (!confirm(`¿Agregar las categorías a ${porFicha.size} ficha${porFicha.size === 1 ? "" : "s"}?`)) return;
+      if (!confirm(`¿Asignar las categorías a ${porFicha.size} comentario${porFicha.size === 1 ? "" : "s"} por aprobar?`)) return;
       const ops = [...porFicha].map(([id, nuevas]) => {
-        const p = modelo.personas.find((x) => x.id === id);
+        const p = datos.aportes.find((x) => x.id === id);
         const cats = [...(p.cats || [])];
         for (const n of nuevas) if (!cats.some((x) => x.c === n.c && norm(x.s) === norm(n.s))) cats.push(n);
         return { id, ficha: fichaActual(p, cats.slice(0, 8)) };
@@ -929,7 +930,7 @@
           toast(`Guardando… ${Math.min(i + 50, ops.length)} de ${ops.length}`);
           hechos += (await api("POST", { accion: "lote-editar", ops: ops.slice(i, i + 50) })).hechos || 0;
         }
-        toast(`${hechos} fichas actualizadas`);
+        toast(`${hechos} comentarios actualizados (siguen por aprobar)`);
         await cargar();
       } catch (err) { toast(err.message); }
       return;
