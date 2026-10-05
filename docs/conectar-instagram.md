@@ -27,6 +27,10 @@ Los nombres de los botones de Meta cambian seguido; si algo no calza, busca el e
    https://comunidad-mamafuriosa.netlify.app/api/instagram/callback
    ```
 
+   > **Ojo:** no la pongas en **"Configurar webhooks"** ("URL de devolución de llamada"): esa sección es otra cosa y
+   > no se usa. Si la URI no está en el inicio de sesión empresarial, Instagram responde
+   > **"Invalid redirect_uri"** al abrir el enlace de conexión. Tras corregirla y guardar, el mismo enlace vuelve a servir.
+
 5. **Roles de la app → Roles → Agregar personas → Evaluador de Instagram** → escribe `mamafuriosayque`.
    Mientras la app esté "en desarrollo" (no hace falta publicarla ni pasar revisión de Meta), solo pueden
    conectarse cuentas invitadas como evaluadoras.
