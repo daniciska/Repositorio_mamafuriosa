@@ -185,6 +185,7 @@ export async function diagnostico() {
       ["Post elegido", q(c.mediaId, "id,comments_count,media_product_type,timestamp"), (j) => `${j.comments_count} comentarios · ${j.media_product_type || ""} · publicado ${j.timestamp || ""}`],
       ["Comentarios (campos mínimos)", q(c.mediaId + "/comments", "id,timestamp", { limit: "25" }), (j) => `${(j.data || []).length} en la primera página${j.paging?.next ? " (hay más páginas)" : ""}`],
       ["Comentarios con usuario y texto", q(c.mediaId + "/comments", "id,text,username,timestamp", { limit: "25" }), (j) => `${(j.data || []).length} en la primera página · ${(j.data || []).filter((k) => k.username).length} traen usuario`],
+      ["Comentarios con autor (campo from)", q(c.mediaId + "/comments", "id,username,from{id,username}", { limit: "25" }), (j) => `${(j.data || []).length} en la primera página · ${(j.data || []).filter((k) => k.from?.username).length} traen autor en from · ${(j.data || []).filter((k) => k.username || k.from?.username).length} con algún usuario`],
     );
   }
   const out = [];
@@ -195,16 +196,22 @@ export async function diagnostico() {
   return out;
 }
 
+const CAMPOS_CON_FROM = "id,text,username,from{id,username},timestamp,replies{id,text,username,from{id,username},timestamp}";
+const CAMPOS_BASICOS = "id,text,username,timestamp,replies{id,text,username,timestamp}";
+
 async function todosLosComentarios(c) {
+  try { return await leerComentarios(c, CAMPOS_CON_FROM); }
+  catch { return leerComentarios(c, CAMPOS_BASICOS); } // por si Instagram no acepta el campo `from`
+}
+
+async function leerComentarios(c, fields) {
   const out = [];
-  let url = `${GRAPH()}/${c.mediaId}/comments?` + new URLSearchParams({
-    fields: "id,text,username,timestamp,replies{id,text,username,timestamp}", limit: "50", access_token: c.token,
-  });
+  let url = `${GRAPH()}/${c.mediaId}/comments?` + new URLSearchParams({ fields, limit: "50", access_token: c.token });
   for (let pagina = 0; url && pagina < 40; pagina++) {
     const r = await pedir(url);
     for (const k of r.data || []) {
       out.push(k);
-      for (const rep of k.replies?.data || []) out.push({ ...rep, respuestaA: k.username });
+      for (const rep of k.replies?.data || []) out.push({ ...rep, respuestaA: k.username || k.from?.username });
     }
     url = r.paging?.next || null;
   }
@@ -241,13 +248,14 @@ export async function sincronizar() {
   for (const k of comentarios) {
     if (!k.id) continue;
     if (vistos.has(k.id)) { r.yaVistos++; continue; }
-    const usuario = cleanIg(k.username);
+    const usuario = cleanIg(k.username || k.from?.username);
     const texto = clean(k.text, 1500);
     const fecha = Date.parse(k.timestamp || "") || Date.now();
     // Anteriores a la fecha elegida: no se marcan como vistos, así se reevalúan si se cambia la fecha.
     if (fecha < desde) { r.anteriores++; continue; }
-    vistos.add(k.id);
+    // Sin usuario: no se marca como visto, así se reevalúa si Instagram empieza a entregarlo.
     if (!usuario) { r.sinUsuario++; continue; }
+    vistos.add(k.id);
     if (usuario.toLowerCase() === String(c.usuario).toLowerCase()) { r.propios++; continue; }
     if (!util(texto)) { r.cortos++; continue; }
     const id = newId();
