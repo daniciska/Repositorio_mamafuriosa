@@ -263,8 +263,10 @@
         <div class="actions">
           ${ig.post ? `<button class="btn btn-ok" data-ig="ig-sincronizar">↻ Revisar comentarios ahora</button>` : ""}
           <button class="btn btn-ghost" data-ig="ig-medios">${ig.post ? "Cambiar post" : "Elegir post"}</button>
+          <button class="btn btn-ghost" data-ig="ig-diagnostico">🔍 Diagnóstico</button>
           <button class="btn btn-no" data-ig="ig-desconectar">Desconectar</button>
         </div>
+        <div id="ig-diag"></div>
       </article>`;
       if (medios) {
         html += `<article class="item">
@@ -314,6 +316,10 @@
       } else if (b.dataset.ig === "ig-medios") {
         medios = (await api("POST", { accion: "ig-medios" })).medios;
         renderInstagram();
+      } else if (b.dataset.ig === "ig-diagnostico") {
+        const { pruebas } = await api("POST", { accion: "ig-diagnostico" });
+        $("#ig-diag").innerHTML = `<ul class="meta" style="margin:8px 0 0;padding-left:18px">${pruebas.map((p) =>
+          `<li>${p.ok ? "✅" : "❌"} <b>${esc(p.prueba)}:</b> ${esc(p.resultado)}</li>`).join("")}</ul>`;
       } else if (b.dataset.ig === "ig-fecha") {
         const r = await api("POST", { accion: "ig-fecha", desde: $("#ig-desde-actual").value });
         toast(r.error ? "Error: " + r.error : `Fecha guardada · ${r.nuevos || 0} comentarios nuevos para revisar`);

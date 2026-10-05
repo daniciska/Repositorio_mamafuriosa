@@ -172,6 +172,29 @@ function util(texto) {
   return letras >= 15;
 }
 
+// Pruebas directas contra Instagram para entender por qué no llegan comentarios (no muestra el token).
+export async function diagnostico() {
+  const c = await conexionValida();
+  if (!c) throw new Error("Instagram no está conectado");
+  const q = (path, fields, extra = {}) => `${GRAPH()}/${path}?` + new URLSearchParams({ fields, access_token: c.token, ...extra });
+  const pruebas = [
+    ["Cuenta conectada", q("me", "user_id,username,account_type"), (j) => `@${j.username} · tipo de cuenta: ${j.account_type || "(no informado)"}`],
+  ];
+  if (c.mediaId) {
+    pruebas.push(
+      ["Post elegido", q(c.mediaId, "id,comments_count,media_product_type,timestamp"), (j) => `${j.comments_count} comentarios · ${j.media_product_type || ""} · publicado ${j.timestamp || ""}`],
+      ["Comentarios (campos mínimos)", q(c.mediaId + "/comments", "id,timestamp", { limit: "25" }), (j) => `${(j.data || []).length} en la primera página${j.paging?.next ? " (hay más páginas)" : ""}`],
+      ["Comentarios con usuario y texto", q(c.mediaId + "/comments", "id,text,username,timestamp", { limit: "25" }), (j) => `${(j.data || []).length} en la primera página · ${(j.data || []).filter((k) => k.username).length} traen usuario`],
+    );
+  }
+  const out = [];
+  for (const [prueba, url, resumen] of pruebas) {
+    try { out.push({ prueba, ok: true, resultado: resumen(await pedir(url)) }); }
+    catch (e) { out.push({ prueba, ok: false, resultado: e.message }); }
+  }
+  return out;
+}
+
 async function todosLosComentarios(c) {
   const out = [];
   let url = `${GRAPH()}/${c.mediaId}/comments?` + new URLSearchParams({
