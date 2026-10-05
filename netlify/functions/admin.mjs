@@ -82,6 +82,23 @@ export default async (req) => {
       return json({ error: e.message }, 400);
     }
   }
+  // Aprobar/rechazar varios aportes pendientes de una vez (el panel envía lotes de hasta 50).
+  if (b?.accion === "lote") {
+    const aportes = store("aportes");
+    const ops = Array.isArray(b.ops) ? b.ops.slice(0, 60) : [];
+    let hechos = 0;
+    const errores = [];
+    for (const op of ops) {
+      const a = await aportes.get(String(op?.id || ""), { type: "json" });
+      if (!a || a.estado !== "pendiente") continue;
+      const final = { ...a, ...(op.ficha ? limpiarFicha(op.ficha) : {}) };
+      if (op.accion === "aprobar" && !(final.cats || []).some((x) => x.c)) { errores.push(a.instagram || a.id); continue; }
+      if (op.accion !== "aprobar" && op.accion !== "rechazar") continue;
+      await aportes.setJSON(a.id, { ...final, estado: op.accion === "aprobar" ? "aprobado" : "rechazado", revisado: new Date().toISOString() });
+      hechos++;
+    }
+    return json({ hechos, sinCategoria: errores });
+  }
   const id = String(b?.id || "");
   if (!b || !id || id.length > 120) return json({ error: "Falta id" }, 400);
   const ahora = new Date().toISOString();

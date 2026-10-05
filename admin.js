@@ -15,6 +15,30 @@
   let datos = { aportes: [], solicitudes: [], ediciones: [] };
   let modelo = { categorias: [], personas: [] };
   let tab = "pendientes";
+  const selPend = new Set();
+  let filtroPend = "todos";
+  let pendCtx = { pend: [], visibles: [] };
+
+  // Ficha completa para aprobar (el servidor reemplaza todos los campos con lo que se envía).
+  function fichaPara(x, cats, region) {
+    const d = window.MF_UBICACION.detectar(x);
+    return {
+      nombre: x.nombre || "", instagram: x.instagram || "", descripcion: x.descripcion || "", whatsapp: x.whatsapp || "",
+      web: x.web || "", ubicacion: x.ubicacion || "", modalidad: x.modalidad || "", otrosInstagram: x.otrosInstagram || [],
+      cats, region: x.region || region || "", todoChile: Boolean(x.todoChile) || d.todoChile,
+      ...(x.categoriaNombre ? { categoriaNombre: x.categoriaNombre, categoriaEmoji: x.categoriaEmoji } : {})
+    };
+  }
+
+  async function enLotes(ops, verbo) {
+    let hechos = 0, sinCat = 0;
+    for (let i = 0; i < ops.length; i += 50) {
+      toast(`${verbo}… ${Math.min(i + 50, ops.length)} de ${ops.length}`);
+      const r = await api("POST", { accion: "lote", ops: ops.slice(i, i + 50) });
+      hechos += r.hechos || 0; sinCat += (r.sinCategoria || []).length;
+    }
+    return { hechos, sinCat };
+  }
 
   function toast(t) {
     const el = $("#toast");
@@ -100,26 +124,76 @@
     const existentes = new Set(modelo.personas.map((p) => cleanIg(p.instagram).toLowerCase()).filter(Boolean));
     const repetido = (a) => a.origen === "instagram" && existentes.has(cleanIg(a.instagram).toLowerCase());
     const repetidos = pend.filter(repetido);
-    $("#tab-pendientes").innerHTML = (repetidos.length ? `<div class="toolbar"><button class="btn btn-no small-btn" data-rechazar-repetidos>✕ Rechazar los ${repetidos.length} comentarios de cuentas que ya están en el directorio</button></div>` : "") +
-      (pend.length ? pend.map((a) => {
-        const sinCat = !(a.cats || []).some((x) => x.c);
+    const sugDe = (x) => ((x.cats || []).some((y) => y.c) ? x.cats : window.MF_SUGERENCIAS.sugerir(x.descripcion));
+    const regionDe = (x) => { const d = window.MF_UBICACION.detectar(x); return x.region || (d.regiones.length === 1 ? d.regiones[0] : ""); };
+    const nombreCat = (y) => { const c = modelo.categorias.find((k) => k.id === y.c) || catsPend.find((k) => k.id === y.c); return (c ? c.emoji + " " + c.nombre : y.c) + (y.s ? " › " + y.s : ""); };
+    const filtros = {
+      todos: () => true,
+      sugeridos: (x) => !repetido(x) && sugDe(x).length,
+      sinsug: (x) => !repetido(x) && !sugDe(x).length,
+      repetidos: repetido,
+      formulario: (x) => x.origen !== "instagram"
+    };
+    const visibles = pend.filter(filtros[filtroPend] || filtros.todos);
+    for (const id of [...selPend]) if (!pend.some((x) => x.id === id)) selPend.delete(id);
+    const cuenta = (f) => pend.filter(filtros[f]).length;
+    const opcionesCat = modelo.categorias.map((c) => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.nombre)}</option>`).join("");
+
+    $("#tab-pendientes").innerHTML = !pend.length ? `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>` : `
+      <div class="item bulk">
+        <div class="toolbar" style="margin:0">
+          <label class="sub-select"><span>Mostrar</span><select id="filtro-pend">
+            <option value="todos">Todos (${pend.length})</option>
+            <option value="sugeridos">Con categoría sugerida (${cuenta("sugeridos")})</option>
+            <option value="sinsug">Sin sugerencia (${cuenta("sinsug")})</option>
+            <option value="repetidos">Ya están en el directorio (${cuenta("repetidos")})</option>
+            <option value="formulario">Del formulario (${cuenta("formulario")})</option>
+          </select></label>
+          <label class="chk"><input type="checkbox" id="sel-todo" ${visibles.length && visibles.every((x) => selPend.has(x.id)) ? "checked" : ""}> Seleccionar los ${visibles.length} que se muestran</label>
+          <b id="sel-n">${selPend.size} seleccionados</b>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ok small-btn" data-bulk="sugerida">✓ Aprobar seleccionados con su sugerencia</button>
+          <button class="btn btn-no small-btn" data-bulk="rechazar">✕ Rechazar seleccionados</button>
+        </div>
+        <div class="toolbar" style="margin:0">
+          <span class="meta">O asignar a todos los seleccionados:</span>
+          <select id="bulk-cat" style="font:inherit;border:2px solid var(--line);border-radius:12px;padding:8px 10px">${opcionesCat}</select>
+          <input id="bulk-sub" list="bulk-subs" placeholder="Subcategoría" style="font:inherit;border:2px solid var(--line);border-radius:12px;padding:8px 10px">
+          <datalist id="bulk-subs"></datalist>
+          <button class="btn btn-ghost small-btn" data-bulk="asignar">Asignar y aprobar</button>
+        </div>
+      </div>` + visibles.map((x) => {
+        const sug = sugDe(x);
+        const tieneCat = (x.cats || []).some((y) => y.c);
+        const reg = regionDe(x);
         return `
       <article class="item">
-        <h3>${esc(titulo(a))}
-          ${a.origen === "instagram" ? '<span class="pill">📸 comentario de Instagram</span>' : '<span class="pill">formulario</span>'}
-          ${repetido(a) ? '<span class="pill warn">ya está en el directorio</span>' : ""}
-          ${a.respuestaA ? `<span class="pill">respuesta a @${esc(a.respuestaA)}</span>` : ""}
+        <h3><input type="checkbox" data-sel="${esc(x.id)}" ${selPend.has(x.id) ? "checked" : ""} style="width:20px;height:20px;vertical-align:middle;accent-color:var(--purple)">
+          ${esc(titulo(x))}
+          ${x.origen === "instagram" ? '<span class="pill">📸 comentario de Instagram</span>' : '<span class="pill">formulario</span>'}
+          ${repetido(x) ? '<span class="pill warn">ya está en el directorio</span>' : ""}
+          ${x.respuestaA ? `<span class="pill">respuesta a @${esc(x.respuestaA)}</span>` : ""}
         </h3>
-        <div class="meta">${a.comentarioFecha ? "Comentado " + esc(fecha(a.comentarioFecha)) : "Recibido " + esc(fecha(a.fecha))} · ${contacto(a)}</div>
-        <div>${sinCat ? '<span class="pill warn">sin categoría</span>' : catsTexto(a, catsPend)}${a.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === a.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
-        <p>${esc(a.descripcion)}</p>
+        <div class="meta">${x.comentarioFecha ? "Comentado " + esc(fecha(x.comentarioFecha)) : "Recibido " + esc(fecha(x.fecha))} · ${contacto(x)}</div>
+        <div>${tieneCat ? catsTexto(x, catsPend) : sug.length ? `<span class="pill ok">💡 Sugerida: ${esc(sug.map(nombreCat).join(" + "))}</span>` : '<span class="pill warn">sin categoría ni sugerencia</span>'}
+          ${reg ? `<span class="pill">📍 ${esc(window.MF_UBICACION.nombreRegion(reg) || "Solo online")}${x.region ? "" : " (sugerida)"}</span>` : ""}
+          ${x.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === x.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
+        <p>${esc(x.descripcion)}</p>
         <div class="actions">
-          ${sinCat ? "" : `<button class="btn btn-ok" data-act="aprobar" data-id="${esc(a.id)}">✓ Aprobar</button>`}
-          <button class="btn ${sinCat ? "btn-ok" : "btn-ghost"}" data-edit-pend="${esc(a.id)}">${sinCat ? "✎ Elegir categoría y aprobar" : "✎ Editar y aprobar"}</button>
-          <button class="btn btn-no" data-act="rechazar" data-id="${esc(a.id)}">✕ Rechazar</button>
+          ${sug.length ? `<button class="btn btn-ok" data-aprobar-sug="${esc(x.id)}">✓ Aprobar${tieneCat ? "" : " con sugerencia"}</button>` : ""}
+          <button class="btn btn-ghost" data-edit-pend="${esc(x.id)}">✎ ${sug.length ? "Editar y aprobar" : "Elegir categoría y aprobar"}</button>
+          <button class="btn btn-no" data-act="rechazar" data-id="${esc(x.id)}">✕ Rechazar</button>
         </div>
       </article>`;
-      }).join("") : `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>`);
+      }).join("");
+    if (pend.length) {
+      $("#filtro-pend").value = filtroPend;
+      const fillBulkSubs = () => { $("#bulk-subs").innerHTML = (modelo.categorias.find((c) => c.id === $("#bulk-cat").value)?.subs || []).map((x) => `<option value="${esc(x)}">`).join(""); };
+      $("#bulk-cat").addEventListener("change", () => { $("#bulk-sub").value = ""; fillBulkSubs(); });
+      fillBulkSubs();
+    }
+    pendCtx = { pend, visibles, sugDe, regionDe };
 
     // Solicitudes
     const verTodas = $("#ver-cerradas").checked;
@@ -176,6 +250,49 @@
   $("#fq").addEventListener("input", renderFichas);
   $("#solo-ocultas").addEventListener("change", renderFichas);
   $("#ver-cerradas").addEventListener("change", render);
+
+  // ---------- selección y acciones en bloque (aportes por aprobar) ----------
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "filtro-pend") { filtroPend = e.target.value; render(); return; }
+    if (e.target.id === "sel-todo") {
+      for (const x of pendCtx.visibles) e.target.checked ? selPend.add(x.id) : selPend.delete(x.id);
+      document.querySelectorAll("[data-sel]").forEach((c) => { c.checked = e.target.checked; });
+    } else if (e.target.matches("[data-sel]")) {
+      e.target.checked ? selPend.add(e.target.dataset.sel) : selPend.delete(e.target.dataset.sel);
+    } else return;
+    const n = $("#sel-n"); if (n) n.textContent = `${selPend.size} seleccionados`;
+  });
+  document.addEventListener("click", async (e) => {
+    const unico = e.target.closest("[data-aprobar-sug]");
+    const bulk = e.target.closest("[data-bulk]");
+    if (!unico && !bulk) return;
+    const { pend, sugDe, regionDe } = pendCtx;
+    const elegidos = unico ? pend.filter((x) => x.id === unico.dataset.aprobarSug) : pend.filter((x) => selPend.has(x.id));
+    if (!elegidos.length) { toast("Primero selecciona aportes con las casillas"); return; }
+    let ops, verbo;
+    if (unico || bulk.dataset.bulk === "sugerida") {
+      const conSug = elegidos.filter((x) => sugDe(x).length);
+      if (!unico && !confirm(`¿Publicar ${conSug.length} aportes con su categoría sugerida?${conSug.length < elegidos.length ? `\n(${elegidos.length - conSug.length} sin sugerencia quedan pendientes)` : ""}`)) return;
+      ops = conSug.map((x) => ({ accion: "aprobar", id: x.id, ficha: fichaPara(x, sugDe(x), regionDe(x)) }));
+      verbo = "Aprobando";
+    } else if (bulk.dataset.bulk === "asignar") {
+      const c = $("#bulk-cat").value, sub = $("#bulk-sub").value.trim();
+      if (!confirm(`¿Asignar "${c}${sub ? " › " + sub : ""}" y publicar ${elegidos.length} aportes?`)) return;
+      ops = elegidos.map((x) => ({ accion: "aprobar", id: x.id, ficha: fichaPara(x, [{ c, s: sub }], regionDe(x)) }));
+      verbo = "Aprobando";
+    } else {
+      if (!confirm(`¿Rechazar ${elegidos.length} aportes? No se publicarán.`)) return;
+      ops = elegidos.map((x) => ({ accion: "rechazar", id: x.id }));
+      verbo = "Rechazando";
+    }
+    (unico || bulk).disabled = true;
+    try {
+      const r = await enLotes(ops, verbo);
+      ops.forEach((o) => selPend.delete(o.id));
+      toast(`${r.hechos} ${verbo === "Rechazando" ? "rechazados" : "publicados"}${r.sinCat ? ` · ${r.sinCat} sin categoría quedaron pendientes` : ""}`);
+      await cargar();
+    } catch (err) { toast(err.message); (unico || bulk).disabled = false; }
+  });
 
   // ---------- acciones ----------
   const CONFIRM = {
@@ -293,7 +410,7 @@
         if (!confirm("¿Rechazar todos los comentarios de cuentas que ya tienen ficha?")) { btn.disabled = false; return; }
         const existentes = new Set(modelo.personas.map((p) => cleanIg(p.instagram).toLowerCase()));
         const ids = datos.aportes.filter((a) => a.estado === "pendiente" && a.origen === "instagram" && existentes.has(cleanIg(a.instagram).toLowerCase())).map((a) => a.id);
-        for (const id of ids) await api("POST", { accion: "rechazar", id });
+        await enLotes(ids.map((id) => ({ accion: "rechazar", id })), "Rechazando");
         toast(`${ids.length} comentarios repetidos rechazados`);
         await cargar();
       } else if (m) {
