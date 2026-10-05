@@ -134,12 +134,14 @@
       repetidos: repetido,
       formulario: (x) => x.origen !== "instagram"
     };
-    const visibles = pend.filter(filtros[filtroPend] || filtros.todos);
-    for (const id of [...selPend]) if (!pend.some((x) => x.id === id)) selPend.delete(id);
+    const rechazados = datos.aportes.filter((x) => x.estado === "rechazado").sort((x, y) => String(y.revisado || "").localeCompare(String(x.revisado || "")));
+    const verRechazados = filtroPend === "rechazados";
+    const visibles = verRechazados ? rechazados : pend.filter(filtros[filtroPend] || filtros.todos);
+    for (const id of [...selPend]) if (!visibles.some((x) => x.id === id)) selPend.delete(id);
     const cuenta = (f) => pend.filter(filtros[f]).length;
     const opcionesCat = modelo.categorias.map((c) => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.nombre)}</option>`).join("");
 
-    $("#tab-pendientes").innerHTML = !pend.length ? `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>` : `
+    $("#tab-pendientes").innerHTML = !pend.length && !rechazados.length ? `<p class="empty-msg">No hay aportes esperando aprobación 🎉</p>` : `
       <div class="item bulk">
         <div class="toolbar" style="margin:0">
           <label class="sub-select"><span>Mostrar</span><select id="filtro-pend">
@@ -148,10 +150,15 @@
             <option value="sinsug">Sin sugerencia (${cuenta("sinsug")})</option>
             <option value="repetidos">Ya están en el directorio (${cuenta("repetidos")})</option>
             <option value="formulario">Del formulario (${cuenta("formulario")})</option>
+            <option value="rechazados">🗂 Rechazados (${rechazados.length})</option>
           </select></label>
           <label class="chk"><input type="checkbox" id="sel-todo" ${visibles.length && visibles.every((x) => selPend.has(x.id)) ? "checked" : ""}> Seleccionar los ${visibles.length} que se muestran</label>
           <b id="sel-n">${selPend.size} seleccionados</b>
         </div>
+        ${verRechazados ? `<div class="actions">
+          <button class="btn btn-ok small-btn" data-bulk="recuperar">↩ Volver a pendientes los seleccionados</button>
+        </div>
+        <p class="meta" style="margin:0">Los rechazados no se publican ni se borran. Si recuperas uno, vuelve a "Aportes por aprobar" para revisarlo de nuevo.</p>` : `
         <div class="actions">
           <button class="btn btn-ok small-btn" data-bulk="sugerida">✓ Aprobar seleccionados con su sugerencia</button>
           <button class="btn btn-no small-btn" data-bulk="rechazar">✕ Rechazar seleccionados</button>
@@ -162,8 +169,8 @@
           <input id="bulk-sub" list="bulk-subs" placeholder="Subcategoría" style="font:inherit;border:2px solid var(--line);border-radius:12px;padding:8px 10px">
           <datalist id="bulk-subs"></datalist>
           <button class="btn btn-ghost small-btn" data-bulk="asignar">Asignar y aprobar</button>
-        </div>
-      </div>` + visibles.map((x) => {
+        </div>`}
+      </div>` + (verRechazados && !visibles.length ? `<p class="empty-msg">No hay aportes rechazados.</p>` : "") + visibles.map((x) => {
         const sug = sugDe(x);
         const tieneCat = (x.cats || []).some((y) => y.c);
         const reg = regionDe(x);
@@ -175,25 +182,26 @@
           ${repetido(x) ? '<span class="pill warn">ya está en el directorio</span>' : ""}
           ${x.respuestaA ? `<span class="pill">respuesta a @${esc(x.respuestaA)}</span>` : ""}
         </h3>
-        <div class="meta">${x.comentarioFecha ? "Comentado " + esc(fecha(x.comentarioFecha)) : "Recibido " + esc(fecha(x.fecha))} · ${contacto(x)}</div>
+        <div class="meta">${x.comentarioFecha ? "Comentado " + esc(fecha(x.comentarioFecha)) : "Recibido " + esc(fecha(x.fecha))}${x.estado === "rechazado" && x.revisado ? " · rechazado el " + esc(fecha(x.revisado)) : ""} · ${contacto(x)}</div>
         <div>${tieneCat ? catsTexto(x, catsPend) : sug.length ? `<span class="pill ok">💡 Sugerida: ${esc(sug.map(nombreCat).join(" + "))}</span>` : '<span class="pill warn">sin categoría ni sugerencia</span>'}
           ${reg ? `<span class="pill">📍 ${esc(window.MF_UBICACION.nombreRegion(reg) || "Solo online")}${x.region ? "" : " (sugerida)"}</span>` : ""}
           ${x.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === x.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
         <p>${esc(x.descripcion)}</p>
         <div class="actions">
+          ${x.estado === "rechazado" ? `<button class="btn btn-ok" data-recuperar="${esc(x.id)}">↩ Volver a pendientes</button>` : `
           ${sug.length ? `<button class="btn btn-ok" data-aprobar-sug="${esc(x.id)}">✓ Aprobar${tieneCat ? "" : " con sugerencia"}</button>` : ""}
           <button class="btn btn-ghost" data-edit-pend="${esc(x.id)}">✎ ${sug.length ? "Editar y aprobar" : "Elegir categoría y aprobar"}</button>
-          <button class="btn btn-no" data-act="rechazar" data-id="${esc(x.id)}">✕ Rechazar</button>
+          <button class="btn btn-no" data-act="rechazar" data-id="${esc(x.id)}">✕ Rechazar</button>`}
         </div>
       </article>`;
       }).join("");
-    if (pend.length) {
-      $("#filtro-pend").value = filtroPend;
+    if ($("#filtro-pend")) $("#filtro-pend").value = filtroPend;
+    if ($("#bulk-cat")) {
       const fillBulkSubs = () => { $("#bulk-subs").innerHTML = (modelo.categorias.find((c) => c.id === $("#bulk-cat").value)?.subs || []).map((x) => `<option value="${esc(x)}">`).join(""); };
       $("#bulk-cat").addEventListener("change", () => { $("#bulk-sub").value = ""; fillBulkSubs(); });
       fillBulkSubs();
     }
-    pendCtx = { pend, visibles, sugDe, regionDe };
+    pendCtx = { pend, visibles, sugDe, regionDe, rechazados };
 
     // Solicitudes
     const verTodas = $("#ver-cerradas").checked;
@@ -263,6 +271,18 @@
     const n = $("#sel-n"); if (n) n.textContent = `${selPend.size} seleccionados`;
   });
   document.addEventListener("click", async (e) => {
+    const recup = e.target.closest("[data-recuperar]");
+    if (recup || e.target.closest("[data-bulk=recuperar]")) {
+      const ids = recup ? [recup.dataset.recuperar] : pendCtx.rechazados.filter((x) => selPend.has(x.id)).map((x) => x.id);
+      if (!ids.length) { toast("Primero selecciona aportes con las casillas"); return; }
+      try {
+        const r = await enLotes(ids.map((id) => ({ accion: "recuperar", id })), "Recuperando");
+        ids.forEach((id) => selPend.delete(id));
+        toast(`${r.hechos} de vuelta en "Aportes por aprobar"`);
+        await cargar();
+      } catch (err) { toast(err.message); }
+      return;
+    }
     const unico = e.target.closest("[data-aprobar-sug]");
     const bulk = e.target.closest("[data-bulk]");
     if (!unico && !bulk) return;

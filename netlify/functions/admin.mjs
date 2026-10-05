@@ -90,7 +90,13 @@ export default async (req) => {
     const errores = [];
     for (const op of ops) {
       const a = await aportes.get(String(op?.id || ""), { type: "json" });
-      if (!a || a.estado !== "pendiente") continue;
+      if (!a) continue;
+      // Recuperar: un aporte rechazado vuelve a "pendiente" para revisarlo de nuevo.
+      if (op.accion === "recuperar") {
+        if (a.estado === "rechazado") { await aportes.setJSON(a.id, { ...a, estado: "pendiente", recuperado: new Date().toISOString() }); hechos++; }
+        continue;
+      }
+      if (a.estado !== "pendiente") continue;
       const final = { ...a, ...(op.ficha ? limpiarFicha(op.ficha) : {}) };
       if (op.accion === "aprobar" && !(final.cats || []).some((x) => x.c)) { errores.push(a.instagram || a.id); continue; }
       if (op.accion !== "aprobar" && op.accion !== "rechazar") continue;
