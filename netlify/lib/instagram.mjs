@@ -43,7 +43,8 @@ export async function iniciar(req) {
   if (!configurada()) throw new Error("Faltan IG_APP_ID e IG_APP_SECRET en las variables de entorno de Netlify");
   const state = randomBytes(24).toString("hex");
   // 48 h de validez: el enlace se puede enviar a la dueña de la cuenta para que lo abra desde su teléfono.
-  await ig().setJSON("state", { state, expira: Date.now() + 48 * 60 * 60 * 1000 });
+  // Cada enlace guarda su propio `state`, así que generar uno nuevo no invalida los anteriores.
+  await ig().setJSON("state-" + state, { expira: Date.now() + 48 * 60 * 60 * 1000 });
   const u = new URL(AUTHORIZE());
   u.searchParams.set("client_id", process.env.IG_APP_ID);
   u.searchParams.set("redirect_uri", redirectUri(req));
@@ -54,11 +55,12 @@ export async function iniciar(req) {
 }
 
 export async function completar(req, code, state) {
-  const guardado = await ig().get("state", { type: "json" });
-  if (!guardado || !state || guardado.state !== state || guardado.expira < Date.now()) {
+  const valido = /^[0-9a-f]{48}$/.test(String(state || ""));
+  const guardado = valido ? await ig().get("state-" + state, { type: "json" }) : null;
+  if (!guardado || guardado.expira < Date.now()) {
     throw new Error("La autorización expiró o no es válida. Vuelve a intentarlo desde el panel.");
   }
-  await ig().delete("state");
+  await ig().delete("state-" + state);
 
   const form = new URLSearchParams({
     client_id: process.env.IG_APP_ID, client_secret: process.env.IG_APP_SECRET,
@@ -81,6 +83,7 @@ export async function completar(req, code, state) {
     usuario: yo.username, userId: String(yo.user_id || yo.id || ""),
     conectada: new Date().toISOString(),
   });
+  await ig().delete("error");
 }
 
 async function conexionValida() {
@@ -109,7 +112,13 @@ export async function estado() {
     desde: c.desde || "",
     ultimaSync: c.ultimaSync || null,
     ultimoResultado: c.ultimoResultado || null,
+    ultimoError: c.token ? null : await ig().get("error", { type: "json" }),
   };
+}
+
+// Guarda el motivo del último intento de conexión fallido, para mostrarlo en el panel.
+export async function registrarError(mensaje) {
+  await ig().setJSON("error", { mensaje: clean(mensaje, 300), fecha: new Date().toISOString() });
 }
 
 export async function desconectar() {

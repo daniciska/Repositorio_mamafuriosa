@@ -229,6 +229,8 @@
     } else if (!ig.conectada) {
       html = `<article class="item">
         <h3>Conectar la cuenta de Instagram</h3>
+        ${ig.ultimoError ? `<p class="form-msg err">⚠ El último intento de conexión (${esc(fecha(ig.ultimoError.fecha))}) falló: ${esc(String(ig.ultimoError.mensaje).replace(/\.+$/, ""))}.
+          Genera un enlace nuevo y vuelve a enviarlo.</p>` : ""}
         <p>La dueña de la cuenta del post debe pulsar este botón (o hacerlo contigo en videollamada) e iniciar sesión en Instagram.
         No se comparte ninguna contraseña con este sitio y el permiso se puede quitar cuando quiera.</p>
         <div class="actions">
@@ -327,7 +329,7 @@
       msg.className = "form-msg";
       msg.textContent = q.get("ig") === "ok"
         ? "✅ ¡Listo! Instagram quedó conectado. Ya puedes cerrar esta página."
-        : "No se pudo conectar Instagram: " + (q.get("msg") || "") + ". Pide un enlace nuevo.";
+        : "No se pudo conectar Instagram: " + (q.get("msg") || "").replace(/\.+$/, "") + ". Pide un enlace nuevo.";
       return;
     }
     setTimeout(() => {
