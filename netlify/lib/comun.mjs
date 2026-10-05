@@ -37,6 +37,13 @@ export async function readBody(req) {
 }
 
 // Ficha pública: solo campos visibles, sin datos internos.
+// Categorías y subcategorías agregadas por el admin: {nuevas: [{id, nombre, emoji, desc, subs}], subs: {catId: [nombre]}}
+export async function leerCategorias() {
+  const c = await store("categorias").get("lista", { type: "json" });
+  return { nuevas: Array.isArray(c?.nuevas) ? c.nuevas : [], subs: c?.subs && typeof c.subs === "object" ? c.subs : {} };
+}
+export const slug = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+
 export const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad", "region", "todoChile"];
 
 export function limpiarFicha(b) {

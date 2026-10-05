@@ -1,15 +1,15 @@
 // GET  /api/aportes  -> datos públicos: aportes aprobados + ediciones del admin a las fichas base
 // POST /api/aportes  -> propuesta de ficha nueva; queda PENDIENTE hasta que la apruebe el admin
-import { store, json, clean, readBody, limpiarFicha, newId, listAll } from "../lib/comun.mjs";
+import { store, json, clean, readBody, limpiarFicha, newId, listAll, leerCategorias } from "../lib/comun.mjs";
 
 export default async (req) => {
   if (req.method === "GET") {
-    const [aportes, ediciones] = await Promise.all([listAll(store("aportes")), listAll(store("ediciones"))]);
+    const [aportes, ediciones, categorias] = await Promise.all([listAll(store("aportes")), listAll(store("ediciones")), leerCategorias()]);
     const publicos = aportes.filter((a) => a.estado === "aprobado").map(({ id, fecha, ...a }) => {
       const f = limpiarFicha(a);
       return { id, fecha, ...f, ...(a.oculta ? { oculta: true } : {}) };
     }).filter((a) => !a.oculta);
-    return json({ aportes: publicos, ediciones });
+    return json({ aportes: publicos, ediciones, categorias });
   }
 
   if (req.method === "POST") {

@@ -6,8 +6,9 @@
 //   ocultar | mostrar         {id}           esconde/restaura una ficha
 //   eliminar                  {id}           borra un aporte (las fichas base solo se ocultan)
 //   resolver | descartar      {id}           solicitud de cambio
+//   cat-agregar {tipo: "sub", cat, nombre} | {tipo: "cat", nombre, emoji, desc}   cat-quitar {tipo, cat, nombre}
 //   ig-iniciar | ig-medios | ig-elegir {mediaId, permalink, caption, desde} | ig-sincronizar | ig-desconectar
-import { store, json, readBody, limpiarFicha, listAll, esAdmin, tokenFicha, clean } from "../lib/comun.mjs";
+import { store, json, readBody, limpiarFicha, listAll, esAdmin, tokenFicha, clean, leerCategorias, slug } from "../lib/comun.mjs";
 import * as instagram from "../lib/instagram.mjs";
 
 const espera = () => new Promise((r) => setTimeout(r, 800));
@@ -24,7 +25,7 @@ export default async (req) => {
     const porFecha = (x, y) => String(y.fecha).localeCompare(String(x.fecha));
     const [r, c] = await Promise.all([listAll(store("regiones")), listAll(store("contactos"))]);
     return json({ aportes: a.sort(porFecha), solicitudes: s.sort(porFecha), ediciones: e, instagram: await instagram.estado(),
-      regiones: r.sort(porFecha), contactos: c });
+      regiones: r.sort(porFecha), contactos: c, categorias: await leerCategorias() });
   }
   if (req.method !== "POST") return new Response("Método no permitido", { status: 405 });
 
@@ -65,6 +66,29 @@ export default async (req) => {
       }
       default: return json({ error: "Acción desconocida" }, 400);
     }
+  }
+  if (b?.accion === "cat-agregar" || b?.accion === "cat-quitar") {
+    const lista = await leerCategorias();
+    const nombre = clean(b.nombre, 40);
+    const igual = (x, y) => slug(x) === slug(y);
+    if (!slug(nombre)) return json({ error: "Escribe un nombre" }, 400);
+    if (b.tipo === "cat") {
+      const id = b.accion === "cat-quitar" ? clean(b.cat, 60) : slug(nombre);
+      if (b.accion === "cat-agregar") {
+        if (lista.nuevas.some((c) => c.id === id || igual(c.nombre, nombre))) return json({ error: "Esa categoría ya existe" }, 400);
+        lista.nuevas.push({ id, nombre, emoji: clean(b.emoji, 16) || "✨", desc: clean(b.desc, 80), subs: [] });
+      } else lista.nuevas = lista.nuevas.filter((c) => c.id !== id);
+    } else {
+      const cat = clean(b.cat, 60);
+      if (!cat) return json({ error: "Falta la categoría" }, 400);
+      const nueva = lista.nuevas.find((c) => c.id === cat);
+      const subs = nueva ? nueva.subs : (lista.subs[cat] ||= []);
+      const resto = subs.filter((s) => !igual(s, nombre));
+      if (b.accion === "cat-agregar") resto.push(nombre);
+      if (nueva) nueva.subs = resto; else if (resto.length) lista.subs[cat] = resto; else delete lista.subs[cat];
+    }
+    await store("categorias").setJSON("lista", lista);
+    return json({ ok: true, categorias: lista });
   }
   if (String(b?.accion || "").startsWith("ig-")) {
     try {

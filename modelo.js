@@ -7,8 +7,18 @@
   const slug = (s) => norm(s).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "otra";
   const CAMPOS = ["nombre", "instagram", "descripcion", "whatsapp", "web", "ubicacion", "modalidad", "region", "todoChile", "otrosInstagram", "cats"];
 
-  function construir({ aportes = [], ediciones = [], incluirOcultas = false } = {}) {
+  function construir({ aportes = [], ediciones = [], categorias: extra = null, incluirOcultas = false } = {}) {
     const categorias = window.CATEGORIAS.map((c) => ({ ...c, subs: [...c.subs], custom: false }));
+    // Categorías y subcategorías que agregó el admin desde el panel.
+    for (const c of (extra && extra.nuevas) || []) {
+      if (!c || !c.id || categorias.some((y) => y.id === c.id)) continue;
+      categorias.push({ id: c.id, nombre: c.nombre, emoji: c.emoji || "✨", desc: c.desc || "", subs: [...(c.subs || [])],
+        color: PALETTE[categorias.length % PALETTE.length], custom: false, delAdmin: true });
+    }
+    for (const [id, subs] of Object.entries((extra && extra.subs) || {})) {
+      const cat = categorias.find((y) => y.id === id);
+      if (cat) for (const s of subs || []) if (!cat.subs.some((y) => norm(y) === norm(s))) { cat.subs.push(s); (cat.subsAdmin ||= []).push(s); }
+    }
     const catById = (id) => categorias.find((c) => c.id === id);
     const eds = {};
     for (const e of ediciones) if (e && e.id) eds[e.id] = e;

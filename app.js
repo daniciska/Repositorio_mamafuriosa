@@ -61,7 +61,7 @@
       const r = await fetch(API, { headers: { accept: "application/json" } });
       if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
         const j = await r.json();
-        remoto = { aportes: Array.isArray(j.aportes) ? j.aportes : [], ediciones: Array.isArray(j.ediciones) ? j.ediciones : [] };
+        remoto = { aportes: Array.isArray(j.aportes) ? j.aportes : [], ediciones: Array.isArray(j.ediciones) ? j.ediciones : [], categorias: j.categorias || null };
         build();
         renderAll();
       }

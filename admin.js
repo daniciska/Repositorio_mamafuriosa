@@ -84,14 +84,14 @@
 
   function rearmar() {
     const aprobados = datos.aportes.filter((a) => a.estado === "aprobado");
-    modelo = window.MF.construir({ aportes: aprobados, ediciones: datos.ediciones, incluirOcultas: true });
+    modelo = window.MF.construir({ aportes: aprobados, ediciones: datos.ediciones, categorias: datos.categorias, incluirOcultas: true });
   }
 
   // ---------- tabs ----------
   document.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => {
     tab = b.dataset.tab;
     document.querySelectorAll("[data-tab]").forEach((x) => x.setAttribute("aria-selected", x === b));
-    ["pendientes", "solicitudes", "fichas", "instagram", "regiones"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
+    ["pendientes", "solicitudes", "fichas", "instagram", "regiones", "categorias"].forEach((t) => { $("#tab-" + t).hidden = t !== tab; });
   }));
 
   function catsTexto(p, cats) {
@@ -226,6 +226,7 @@
     renderFichas();
     renderInstagram();
     renderRegiones();
+    renderCategorias();
   }
 
   function renderFichas() {
@@ -707,6 +708,120 @@
       await cargar();
     } catch (err) { $("#edit-msg").textContent = err.message; }
     btn.disabled = false;
+  });
+
+  // ---------- categorías ----------
+  let catTexto = "";
+  const palabras = (t) => norm(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 4).map((w) => w.slice(0, 5));
+
+  function opcionesCategoria(texto) {
+    const t = norm(texto).trim();
+    if (!t) return "";
+    const cats = modelo.categorias;
+    const igualCat = cats.find((c) => norm(c.nombre) === t);
+    if (igualCat) return `<p class="form-msg">Ya existe la categoría <b>${esc(igualCat.emoji + " " + igualCat.nombre)}</b>.</p>`;
+    const igualSub = cats.find((c) => c.subs.some((s) => norm(s) === t));
+    const aviso = igualSub ? `<p class="form-msg">Ojo: ya existe como subcategoría en <b>${esc(igualSub.emoji + " " + igualSub.nombre)}</b>.</p>` : "";
+    // Candidatas: las que sugiere el clasificador y las que comparten palabras con el texto.
+    const ws = palabras(texto);
+    const puntos = new Map();
+    window.MF_SUGERENCIAS.sugerir(texto).forEach((x, i) => puntos.set(x.c, { n: 10 - i, parecida: x.s }));
+    for (const c of cats) {
+      const enNombre = palabras(c.nombre + " " + (c.desc || "")).filter((w) => ws.includes(w)).length;
+      const sub = c.subs.find((s) => palabras(s).some((w) => ws.includes(w)));
+      const n = enNombre * 2 + (sub ? 1 : 0);
+      if (!n) continue;
+      const prev = puntos.get(c.id) || { n: 0 };
+      puntos.set(c.id, { n: prev.n + n, parecida: prev.parecida || sub });
+    }
+    const top = [...puntos.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 4)
+      .map(([id, v]) => ({ c: cats.find((x) => x.id === id), parecida: v.parecida })).filter((x) => x.c && x.c.id !== igualSub?.id);
+    const nombre = esc(texto.trim());
+    return `${aviso}
+      <h4 style="margin:6px 0">1. Incluir «${nombre}» como subcategoría de…</h4>
+      ${top.length ? `<div class="actions">${top.map((x) => `<button class="btn btn-ok small-btn" data-cat-sub="${esc(x.c.id)}">➕ ${esc(x.c.emoji + " " + x.c.nombre)}</button>`).join("")}</div>
+      <p class="meta">${top.filter((x) => x.parecida).map((x) => `En ${esc(x.c.nombre)} ya está «${esc(x.parecida)}».`).join(" ")}</p>` : `<p class="meta">No encontré una categoría parecida.</p>`}
+      <div class="row" style="flex-wrap:wrap">
+        <label class="sub-select" style="flex:1 1 220px"><span>…o en otra categoría</span><select id="cat-otra">
+          ${cats.map((c) => `<option value="${esc(c.id)}">${esc(c.emoji + " " + c.nombre)}</option>`).join("")}</select></label>
+        <button class="btn btn-ghost small-btn" data-cat-sub-otra style="align-self:flex-end">Agregar ahí</button>
+      </div>
+      <h4 style="margin:14px 0 6px">2. O crear una categoría completamente nueva</h4>
+      <div class="grid-2">
+        <label class="field"><span>Emoji</span><input id="cat-emoji" value="✨" maxlength="8"></label>
+        <label class="field"><span>Descripción corta (opcional)</span><input id="cat-desc" maxlength="80" placeholder="Ej: manicure, pedicure y uñas acrílicas"></label>
+      </div>
+      <div class="actions"><button class="btn btn-add small-btn" data-cat-nueva>✨ Crear categoría «${nombre}»</button></div>`;
+  }
+
+  function renderCategorias() {
+    const uso = new Map();
+    for (const p of modelo.personas) for (const x of p.cats || []) {
+      uso.set(x.c, (uso.get(x.c) || 0) + 1);
+      if (x.s) uso.set(x.c + "|" + norm(x.s), (uso.get(x.c + "|" + norm(x.s)) || 0) + 1);
+    }
+    $("#tab-categorias").innerHTML = `
+      <article class="item">
+        <h3>Agregar categoría o subcategoría</h3>
+        <p class="meta">Escribe lo que quieres agregar (ej. «Uñas», «Clases de inglés», «Mascotas») y te muestro si calza como subcategoría de alguna existente o si conviene crear una nueva.</p>
+        <div class="toolbar" style="margin:0">
+          <input id="cat-texto" type="search" maxlength="40" placeholder="¿Qué quieres agregar?" value="${esc(catTexto)}">
+          <button class="btn btn-add small-btn" data-cat-ver>Ver opciones</button>
+        </div>
+        <div id="cat-opciones">${opcionesCategoria(catTexto)}</div>
+      </article>
+      <p class="meta">Categorías actuales. Las que agregaste desde aquí se pueden quitar con ✕ mientras ninguna ficha las use.</p>
+      ${modelo.categorias.map((c) => `<article class="item">
+        <h3>${esc(c.emoji + " " + c.nombre)} <span class="pill">${uso.get(c.id) || 0} fichas</span>
+          ${c.delAdmin ? `<span class="pill ok">agregada por ti</span>${uso.get(c.id) ? "" : ` <button class="btn btn-no small-btn" data-cat-quitar="${esc(c.id)}">✕ Quitar</button>`}` : ""}</h3>
+        <div>${c.subs.map((s) => {
+          const n = uso.get(c.id + "|" + norm(s)) || 0;
+          const mia = c.delAdmin || (c.subsAdmin || []).includes(s);
+          return `<span class="pill ${mia ? "ok" : ""}">${esc(s)} · ${n}${mia && !n ? ` <button class="icon-btn" style="width:auto;padding:0 4px;background:none" data-sub-quitar="${esc(s)}" data-cat="${esc(c.id)}" aria-label="Quitar">✕</button>` : ""}</span>`;
+        }).join(" ") || `<span class="meta">Sin subcategorías</span>`}</div>
+      </article>`).join("")}`;
+  }
+
+  async function guardarCategoria(body, ok) {
+    try {
+      const r = await api("POST", body);
+      datos.categorias = r.categorias;
+      toast(ok);
+      render();
+    } catch (err) { toast(err.message); }
+  }
+
+  $("#tab-categorias").addEventListener("keydown", (e) => {
+    if (e.target.id === "cat-texto" && e.key === "Enter") { e.preventDefault(); $("[data-cat-ver]").click(); }
+  });
+  $("#tab-categorias").addEventListener("click", async (e) => {
+    const t = e.target.closest("button");
+    if (!t) return;
+    if (t.hasAttribute("data-cat-ver")) {
+      catTexto = $("#cat-texto").value.trim();
+      $("#cat-opciones").innerHTML = opcionesCategoria(catTexto);
+      return;
+    }
+    const nombre = catTexto;
+    if (t.dataset.catSub || t.hasAttribute("data-cat-sub-otra")) {
+      const cat = t.dataset.catSub || $("#cat-otra").value;
+      const c = modelo.categorias.find((x) => x.id === cat);
+      if (!confirm(`¿Agregar «${nombre}» como subcategoría de ${c.nombre}?`)) return;
+      catTexto = "";
+      await guardarCategoria({ accion: "cat-agregar", tipo: "sub", cat, nombre }, `«${nombre}» agregada en ${c.nombre}`);
+    } else if (t.hasAttribute("data-cat-nueva")) {
+      const emoji = $("#cat-emoji").value.trim() || "✨", desc = $("#cat-desc").value.trim();
+      if (!confirm(`¿Crear la categoría ${emoji} ${nombre}?`)) return;
+      catTexto = "";
+      await guardarCategoria({ accion: "cat-agregar", tipo: "cat", nombre, emoji, desc }, `Categoría «${nombre}» creada`);
+    } else if (t.dataset.catQuitar) {
+      const c = modelo.categorias.find((x) => x.id === t.dataset.catQuitar);
+      if (!confirm(`¿Quitar la categoría ${c.nombre}?`)) return;
+      await guardarCategoria({ accion: "cat-quitar", tipo: "cat", cat: c.id, nombre: c.nombre }, "Categoría quitada");
+    } else if (t.dataset.subQuitar) {
+      if (!confirm(`¿Quitar la subcategoría «${t.dataset.subQuitar}»?`)) return;
+      await guardarCategoria({ accion: "cat-quitar", tipo: "sub", cat: t.dataset.cat, nombre: t.dataset.subQuitar }, "Subcategoría quitada");
+    }
   });
 
   if (clave) cargar().catch(() => salir());
