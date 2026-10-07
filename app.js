@@ -175,7 +175,11 @@
     </article>`;
   }
 
-  function renderList() {
+  // Se muestran de a POR_PAGINA para que la página no sea eterna; "Mostrar más" suma otra tanda.
+  const POR_PAGINA = window.matchMedia("(max-width: 640px)").matches ? 12 : 24;
+  let mostrar = POR_PAGINA;
+  function renderList(seguir = false) {
+    if (!seguir) mostrar = POR_PAGINA;
     const cat = catById(state.cat);
     const items = personas.filter(matches).sort((a, b) => (b.nuevo === true) - (a.nuevo === true));
     els.title.textContent = cat ? `${cat.emoji} ${cat.nombre}` : state.q ? `Resultados para “${state.q}”` : "Toda la comunidad";
@@ -200,7 +204,9 @@
       </div>`;
       return;
     }
-    els.list.innerHTML = items.map(card).join("");
+    const resto = items.length - mostrar;
+    els.list.innerHTML = items.slice(0, mostrar).map(card).join("") +
+      (resto > 0 ? `<button class="btn btn-ghost mas-fichas" data-mas-fichas>Mostrar más (${resto} ${resto === 1 ? "persona" : "personas"} más)</button>` : "");
   }
 
   function renderAll() { renderCats(); renderSub(); renderLugar(); renderList(); }
@@ -216,6 +222,7 @@
     if (state.cat) document.querySelector(".results").scrollIntoView({ behavior: "smooth", block: "start" });
   });
   els.list.addEventListener("click", (e) => {
+    if (e.target.closest("[data-mas-fichas]")) { mostrar += POR_PAGINA; renderList(true); return; }
     const b = e.target.closest("[data-more]");
     if (!b) return;
     const d = b.previousElementSibling;

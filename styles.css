@@ -96,6 +96,9 @@ a { color: var(--purple); }
   padding: 10px 6px; color: var(--ink); background: transparent;
 }
 .hero-add { margin-top: 18px; }
+.hero-credit { margin: 14px 0 0; font-size: .9rem; opacity: .9; }
+.hero-credit a { color: inherit; font-weight: 700; }
+.mas-fichas { grid-column: 1 / -1; justify-self: center; margin: 8px auto 0; }
 
 .deco { position: absolute; z-index: 0; opacity: .95; }
 .deco-1 { width: 54px; top: 26px; left: 6%; animation: spin 14s linear infinite; }
@@ -279,6 +282,7 @@ dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(3px); }
   .sub-select select { min-width: 0; width: 100%; }
   .results-tools, .sub-select { width: 100%; }
   .deco-2 { display: none; }
+  .deco-4 { bottom: 14px; left: 6%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
