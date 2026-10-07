@@ -126,7 +126,10 @@
     const existentes = new Set(modelo.personas.map((p) => cleanIg(p.instagram).toLowerCase()).filter(Boolean));
     const repetido = (a) => a.origen === "instagram" && existentes.has(cleanIg(a.instagram).toLowerCase());
     const repetidos = pend.filter(repetido);
-    const sugDe = (x) => ((x.cats || []).some((y) => y.c) ? x.cats : window.MF_SUGERENCIAS.sugerir(x.descripcion));
+    // Solo cuentan las categorías que existen (o que creó el admin); una inventada se trata como "sin categoría".
+    const valida = (y) => y && y.c && (modelo.categorias.some((k) => k.id === y.c) || catsPend.some((k) => k.id === y.c));
+    const catsValidas = (x) => (x.cats || []).filter(valida);
+    const sugDe = (x) => (catsValidas(x).length ? catsValidas(x) : window.MF_SUGERENCIAS.sugerir(x.descripcion));
     const regionDe = (x) => { const d = window.MF_UBICACION.detectar(x); return x.region || (d.regiones.length === 1 ? d.regiones[0] : ""); };
     const nombreCat = (y) => { const c = modelo.categorias.find((k) => k.id === y.c) || catsPend.find((k) => k.id === y.c); return (c ? c.emoji + " " + c.nombre : y.c) + (y.s ? " › " + y.s : ""); };
     const filtros = {
@@ -175,7 +178,7 @@
         </div>`}
       </div>` + (verRechazados && !visibles.length ? `<p class="empty-msg">No hay aportes rechazados.</p>` : "") + visibles.map((x) => {
         const sug = sugDe(x);
-        const tieneCat = (x.cats || []).some((y) => y.c);
+        const tieneCat = catsValidas(x).length > 0;
         const reg = regionDe(x);
         return `
       <article class="item">
@@ -186,7 +189,9 @@
           ${x.respuestaA ? `<span class="pill">respuesta a @${esc(x.respuestaA)}</span>` : ""}
         </h3>
         <div class="meta">${x.comentarioFecha ? "Comentado " + esc(fecha(x.comentarioFecha)) : "Recibido " + esc(fecha(x.fecha))}${x.estado === "rechazado" && x.revisado ? " · rechazado el " + esc(fecha(x.revisado)) : ""} · ${contacto(x)}</div>
-        <div>${tieneCat ? catsTexto(x, catsPend) : sug.length ? `<span class="pill ok">💡 Sugerida: ${esc(sug.map(nombreCat).join(" + "))}</span>` : '<span class="pill warn">sin categoría ni sugerencia</span>'}
+        ${x.sugerenciaCategoria ? `<div class="meta">🏷 Sugiere una categoría nueva: <b>${esc(x.sugerenciaCategoria)}</b>
+          <button class="btn btn-ghost small-btn" data-crear-sugerida="${esc(x.sugerenciaCategoria)}">Crearla en Categorías</button></div>` : ""}
+        <div>${tieneCat ? catsTexto({ cats: catsValidas(x) }, catsPend) : sug.length ? `<span class="pill ok">💡 Sugerida: ${esc(sug.map(nombreCat).join(" + "))}</span>` : '<span class="pill warn">sin categoría ni sugerencia</span>'}
           ${reg ? `<span class="pill">📍 ${esc(window.MF_UBICACION.nombreRegion(reg) || "Solo online")}${x.region ? "" : " (sugerida)"}</span>` : ""}
           ${x.categoriaNombre && !window.CATEGORIAS.some((c) => c.id === x.cats?.[0]?.c) ? '<span class="pill warn">categoría nueva</span>' : ""}</div>
         <p>${esc(x.descripcion)}</p>
@@ -896,6 +901,15 @@
     } catch (err) { toast(err.message); }
   }
 
+  // Categoría sugerida por la comunidad: abre Categorías con el texto listo para elegir dónde va.
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-crear-sugerida]");
+    if (!b) return;
+    catTexto = b.dataset.crearSugerida.replace(/\s*[›>]\s*/g, " ").trim();
+    document.querySelector('[data-tab="categorias"]').click();
+    renderCategorias();
+    $("#cat-texto").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
   // Desde "Aportes por aprobar": abre la revisión en la pestaña Categorías.
   document.addEventListener("click", (e) => {
     if (!e.target.closest("[data-ir-actualizar]")) return;

@@ -3,9 +3,6 @@
 
   const API = "/api/aportes";
   const API_SOL = "/api/solicitudes";
-  const EMOJIS = ["✨", "🐾", "🏠", "💇‍♀️", "💅", "🚗", "🧹", "💻", "🧘‍♀️", "🎂", "🌸", "🎉", "🪴", "🧵", "🩺", "💼"];
-  const NEW_CAT = "__nueva__";
-  const NEW_SUB = "__nueva_sub__";
 
   const $ = (s) => document.querySelector(s);
   const els = {
@@ -13,7 +10,7 @@
     lugar: $("#lugar"), inclWrap: $("#incl-wrap"), inclOnline: $("#incl-online"),
     clear: $("#clear"), title: $("#results-title"), count: $("#results-count"),
     dialog: $("#form-dialog"), form: $("#form"), msg: $("#form-msg"), toast: $("#toast"),
-    newCat: $("#new-cat"), newSub: $("#new-sub"), emojiPick: $("#emoji-pick"),
+
     solDialog: $("#sol-dialog"), solForm: $("#sol-form"), solMsg: $("#sol-msg")
   };
 
@@ -25,7 +22,7 @@
   let remoto = { aportes: [], ediciones: [] };
 
   // ---------- helpers ----------
-  const { norm, slug } = window.MF;
+  const { norm } = window.MF;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const cleanIg = (s) => String(s || "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/^@/, "").replace(/[^A-Za-z0-9._]/g, "").slice(0, 30);
   const cleanPhone = (s) => {
@@ -235,21 +232,11 @@
 
   // ---------- form ----------
   const f = els.form.elements;
-  let chosenEmoji = EMOJIS[0];
 
-  els.emojiPick.innerHTML = EMOJIS.map((em, i) =>
-    `<button type="button" role="radio" aria-checked="${i === 0}" data-emoji="${em}">${em}</button>`).join("");
-  els.emojiPick.addEventListener("click", (e) => {
-    const b = e.target.closest("[data-emoji]");
-    if (!b) return;
-    chosenEmoji = b.dataset.emoji;
-    els.emojiPick.querySelectorAll("button").forEach((x) => x.setAttribute("aria-checked", x === b));
-  });
 
   function fillCatSelect(selected) {
     f.categoria.innerHTML = `<option value="">Elige una…</option>` +
-      categorias.map((c) => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.nombre)}</option>`).join("") +
-      `<option value="${NEW_CAT}">＋ Crear nueva categoría</option>`;
+      categorias.map((c) => `<option value="${esc(c.id)}">${esc(c.emoji)} ${esc(c.nombre)}</option>`).join("");
     f.categoria.value = selected || "";
     fillSubSelect();
   }
@@ -258,15 +245,10 @@
     const cat = catById(v);
     const subs = cat ? cat.subs : [];
     f.subcategoria.innerHTML = `<option value="">${v ? "Ninguna / general" : "Primero elige categoría"}</option>` +
-      subs.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("") +
-      (v ? `<option value="${NEW_SUB}">＋ Crear nueva subcategoría</option>` : "");
+      subs.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
     f.subcategoria.disabled = !v;
-    els.newCat.hidden = v !== NEW_CAT;
-    toggleNewSub();
   }
-  function toggleNewSub() { els.newSub.hidden = f.subcategoria.value !== NEW_SUB; }
   f.categoria.addEventListener("change", fillSubSelect);
-  f.subcategoria.addEventListener("change", toggleNewSub);
 
   function openForm() {
     els.form.reset();
@@ -296,23 +278,12 @@
     const descripcion = f.descripcion.value.trim();
     const instagram = cleanIg(f.instagram.value);
     const whatsapp = cleanPhone(f.whatsapp.value);
-    let categoria = f.categoria.value;
-    let categoriaNombre = "", categoriaEmoji = "";
-    let subcategoria = f.subcategoria.value === NEW_SUB ? f.nuevaSubcategoria.value.trim() : f.subcategoria.value;
+    const categoria = f.categoria.value;
+    const subcategoria = f.subcategoria.value;
 
     if (!nombre) return fail("Falta tu nombre 🙂", f.nombre);
     if (!descripcion) return fail("Cuéntanos qué haces", f.descripcion);
     if (!categoria) return fail("Elige una categoría", f.categoria);
-    if (categoria === NEW_CAT) {
-      categoriaNombre = f.nuevaCategoria.value.trim();
-      if (!categoriaNombre) return fail("Escribe el nombre de la nueva categoría", f.nuevaCategoria);
-      const existing = categorias.find((c) => norm(c.nombre) === norm(categoriaNombre));
-      if (existing) { categoria = existing.id; categoriaNombre = existing.nombre; }
-      else { categoria = slug(categoriaNombre); categoriaEmoji = chosenEmoji; }
-    } else {
-      categoriaNombre = catById(categoria)?.nombre || "";
-    }
-    if (f.subcategoria.value === NEW_SUB && !subcategoria) return fail("Escribe la nueva subcategoría", f.nuevaSubcategoria);
     if (!f.region.value) return fail("Elige tu región (o \"Solo online\" si no atiendes en un lugar fijo)", f.region);
     if (!instagram && whatsapp.length < 8) return fail("Deja al menos un contacto: WhatsApp o Instagram", f.whatsapp);
 
@@ -320,7 +291,7 @@
       nombre, descripcion, instagram, whatsapp,
       ubicacion: f.ubicacion.value.trim(), modalidad: f.modalidad.value.trim(),
       region: f.region.value, todoChile: f.todoChile.checked,
-      categoria, categoriaNombre, categoriaEmoji, subcategoria, sitio: f.sitio.value
+      categoria, subcategoria, sugerenciaCategoria: f.sugerenciaCategoria.value.trim(), sitio: f.sitio.value
     };
 
     const btn = els.form.querySelector('button[type="submit"]');

@@ -54,7 +54,8 @@
     for (const a of aportes) {
       if (a.oculta && !incluirOcultas) continue;
       const crudas = a.cats && a.cats.length ? a.cats : a.categoria ? [{ c: a.categoria, s: a.subcategoria }] : [];
-      const cats = crudas.filter((x) => x && x.c).map((x) => asegurarCat(x, a));
+      // Una categoría desconocida solo se crea si la definió el admin (categoriaNombre); si no, se ignora.
+      const cats = crudas.filter((x) => x && x.c && (catById(x.c) || a.categoriaNombre)).map((x) => asegurarCat(x, a));
       personas.push({ ...a, cats, nuevo: true });
     }
     return { categorias, personas };

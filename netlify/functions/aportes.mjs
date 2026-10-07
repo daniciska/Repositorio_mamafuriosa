@@ -22,11 +22,12 @@ export default async (req) => {
     if (!f.nombre || !f.descripcion || !categoria) return json({ error: "Faltan nombre, descripción o categoría" }, 400);
     if (!f.instagram && f.whatsapp.length < 8) return json({ error: "Deja al menos un contacto (WhatsApp o Instagram)" }, 400);
 
+    // La comunidad no crea categorías: elige una existente y, si quiere, sugiere una nueva para que la revise el admin.
+    delete f.categoriaNombre; delete f.categoriaEmoji;
     const item = {
       ...f,
       cats: [{ c: categoria, s: clean(body.subcategoria, 50) }],
-      categoriaNombre: clean(body.categoriaNombre, 40),
-      categoriaEmoji: clean(body.categoriaEmoji, 16),
+      sugerenciaCategoria: clean(body.sugerenciaCategoria, 60),
       id: newId(), fecha: new Date().toISOString(), estado: "pendiente",
     };
     await store("aportes").setJSON(item.id, item);
